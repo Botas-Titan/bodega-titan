@@ -7583,6 +7583,11 @@ function esCiudadLocalSinGuia(ped){
   const esLocal=locales.some(x=>c===x||c.includes(x));
   return esLocal && (d.includes('norte de santander')||d==='');
 }
+// Guía maestra: número fijo y reutilizable para ventas entregadas en persona
+// (sin transportadora). A diferencia de una guía normal, NO se exige que sea
+// única — se puede repetir en todas las entregas locales/en mano.
+const GUIA_MAESTRA = '2400';
+function esGuiaMaestraNum(numero){ return String(numero||'').trim()===GUIA_MAESTRA; }
 // Ajusta la exigencia del número de guía según el pedido seleccionado.
 function onGuiaPedidoChange(){
   const sel=document.getElementById('g-pedido'); if(!sel) return;
@@ -7590,12 +7595,12 @@ function onGuiaPedidoChange(){
   const local=esCiudadLocalSinGuia(ped);
   const numInput=document.getElementById('g-numero');
   const hint=document.getElementById('g-numero-hint');
-  if(numInput) numInput.placeholder = local ? 'Opcional para entrega local — puedes dejarlo vacío' : 'Ej: 8908123456';
+  if(numInput) numInput.placeholder = local ? 'Opcional para entrega local — puedes dejarlo vacío' : `Ej: 8908123456 (o ${GUIA_MAESTRA} si es venta local/en mano)`;
   if(hint){
-    hint.style.display = local ? 'block' : 'none';
+    hint.style.display = 'block';
     hint.innerHTML = local
       ? `<i class="bi bi-info-circle-fill"></i> Entrega local en ${ped&&ped.cliente?ped.cliente.ciudad:''}: el número de guía es <strong>opcional</strong>. Si lo dejas vacío se registrará como <strong>entrega local</strong>.`
-      : '';
+      : `<i class="bi bi-info-circle-fill"></i> ¿Venta entregada en persona, sin transportadora? Escribe <strong>${GUIA_MAESTRA}</strong> como número de guía — es la <strong>guía maestra</strong> y se puede repetir en todas las ventas locales.`;
   }
 }
 function abrirModalGuia(preId){
@@ -7654,13 +7659,20 @@ function guardarGuia(){
       toast('Ingresa el número de guía');return;
     }
   }
-  if(getGuias().some(g=>g.numero===numero)){toast('Ese número de guía ya está registrado');return;}
+  // La guía maestra (venta entregada en persona, sin transportadora) se puede
+  // repetir en todas las ventas locales — no aplica la validación de unicidad.
+  const esMaestra=esGuiaMaestraNum(numero);
+  if(esMaestra){
+    transportadora='local';
+    esEntregaLocal=true;
+  }
+  if(!esMaestra && getGuias().some(g=>g.numero===numero)){toast('Ese número de guía ya está registrado');return;}
   const guia={ id:uid(), pedidoId, numero, transportadora, notas,
-               entregaLocal:esEntregaLocal,
+               entregaLocal:esEntregaLocal, guiaMaestra:esMaestra,
                estadoActual:'registrada', historial:[], ultimoRastreo:null, fecha:hoy(), ts:Date.now() };
   writeGuia(guia);
   writePedido({...ped, guiaId:guia.id, estado: ped.estado==='entregado'?ped.estado:'enviado', tsEstado:Date.now()});
-  toast(esEntregaLocal?'Entrega local registrada — pedido marcado como Enviado':'Guía registrada — pedido marcado como Enviado');
+  toast(esMaestra?'Guía maestra registrada — pedido marcado como Enviado':esEntregaLocal?'Entrega local registrada — pedido marcado como Enviado':'Guía registrada — pedido marcado como Enviado');
   cerrarModal('modal-guia');
   if(currentPage==='guias') renderGuias();
 }
@@ -7934,8 +7946,11 @@ function renderGuiasTabla(){
     // Badge basado en estadoActual de la guía (fuente de verdad del rastreo)
     const eu=estadoGuiaUI(g);
     const esDevol=eu==='devuelta';
+    const esLocalOMaestra=g.transportadora==='local'||g.guiaMaestra;
     // Si la devolución ya fue revisada por el admin → badge verde (solo visual).
-    const badgeGuia=(esDevol && ped && ped.devolucionRevisada)
+    const badgeGuia=esLocalOMaestra
+      ?`<span class="badge badge-gray"><i class="bi bi-shop"></i> ${g.guiaMaestra?'Venta local (guía maestra)':'Entrega local'}</span>`
+      :(esDevol && ped && ped.devolucionRevisada)
       ?'<span class="badge" style="background:#16a34a;color:#fff;font-weight:700"><i class="bi bi-check-circle-fill"></i> Devolución revisada</span>'
       :eu==='entregada'?estadoBadge('entregado'):eu==='novedad'?estadoBadge('novedad'):esDevol?estadoBadge('en_devolucion'):eu==='en_oficina'?'<span class="badge badge-info"><i class="bi bi-building"></i> En oficina</span>':eu==='en_transito'?'<span class="badge badge-enviado"><i class="bi bi-truck"></i> En tránsito</span>':'<span class="badge badge-gray"><i class="bi bi-hourglass-split"></i> Registrada</span>';
     // Chulito "Revisar" (solo admin, solo devoluciones). Visual: no cambia stock.
@@ -7951,9 +7966,9 @@ function renderGuiasTabla(){
       <td style="font-size:12px;color:var(--muted)">${ped?(ped.vendedorNombre||'—'):'—'}</td>
       <td style="font-size:12px;text-transform:capitalize">${g.transportadora||'—'}</td>
       <td>${badgeGuia}${textoRastreo}${ciudadDest}${revBtnGuia?'<div>'+revBtnGuia+'</div>':''}</td>
-      <td style="font-size:11px;color:var(--muted)">${g.ultimoRastreo?fmtT(g.ultimoRastreo):'Nunca'}</td>
+      <td style="font-size:11px;color:var(--muted)">${esLocalOMaestra?'—':(g.ultimoRastreo?fmtT(g.ultimoRastreo):'Nunca')}</td>
       <td><div style="display:flex;gap:4px;align-items:center">
-        <button class="btn btn-sm btn-outline" onclick="rastrearGuia('${g.id}')"><i class="bi bi-arrow-repeat"></i> Rastrear</button>
+        ${esLocalOMaestra?'':`<button class="btn btn-sm btn-outline" onclick="rastrearGuia('${g.id}')"><i class="bi bi-arrow-repeat"></i> Rastrear</button>`}
         ${ped?`<button class="btn-icon" title="Ver pedido" onclick="verDetallePedido('${ped.id}')"><i class="bi bi-eye-fill"></i></button>`:''}
         ${isAdmin()?`<button class="btn-icon" title="Eliminar pedido y guía" style="color:var(--danger)" onclick="eliminarPedidoGuia('${g.id}','${ped?ped.id:''}')"><i class="bi bi-trash-fill"></i></button>`:''}
       </div></td>
@@ -8664,7 +8679,7 @@ function _aplicarResultadoRastreo(guia, result, opts){
 // se omiten para no gastar tiempo — se puede forzar incluirlas.
 let _rastreoMasivoEnCurso=false;
 function _guiasParaRastreoMasivo(incluirFinalizadas){
-  let guias=getGuias().filter(g=>g && g.numero);
+  let guias=getGuias().filter(g=>g && g.numero && g.transportadora!=='local' && !g.guiaMaestra);
   // Vendedora: solo las guías de sus propios pedidos.
   if(!isAdmin()){
     const misIds=new Set(getPedidos().filter(p=>esMiPedido(p)).map(p=>p.id));
