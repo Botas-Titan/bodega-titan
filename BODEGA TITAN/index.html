@@ -7515,7 +7515,7 @@ function guardarEdicionPedido(){
           fecha: hoy(), ts: Date.now()
         };
         writeGuia(nuevaGuia);
-        writePedido({...pedAct, guiaId:nuevaGuia.id, estado: pedAct.estado==='pendiente'?'enviado':pedAct.estado, tsEstado:Date.now()});
+        writePedido(limpiarBackorderPorEnvio({...pedAct, guiaId:nuevaGuia.id, estado: pedAct.estado==='pendiente'?'enviado':pedAct.estado, tsEstado:Date.now()}));
       }
     } else if(guiaActual){
       // Si el usuario vació el número, eliminamos la guía asociada.
@@ -7588,6 +7588,16 @@ function esCiudadLocalSinGuia(ped){
 // única — se puede repetir en todas las entregas locales/en mano.
 const GUIA_MAESTRA = '2400';
 function esGuiaMaestraNum(numero){ return String(numero||'').trim()===GUIA_MAESTRA; }
+// Si un pedido tiene guía y ya está en tránsito, el par físicamente salió de
+// bodega — así que no puede seguir figurando "por reponer" (sin stock físico).
+// Se usa al asignar guía (individual o importación masiva) para que la marca
+// de backorder no quede pegada por error, aunque nunca se haya liberado por
+// la vía normal de entrada de stock.
+function limpiarBackorderPorEnvio(ped){
+  if(!ped.backorderPendiente) return ped;
+  const items=Array.isArray(ped.items) ? ped.items.map(it=>it.backorder?{...it, backorder:false, faltante:0}:it) : ped.items;
+  return {...ped, items, backorderPendiente:false};
+}
 // Ajusta la exigencia del número de guía según el pedido seleccionado.
 function onGuiaPedidoChange(){
   const sel=document.getElementById('g-pedido'); if(!sel) return;
@@ -7671,7 +7681,7 @@ function guardarGuia(){
                entregaLocal:esEntregaLocal, guiaMaestra:esMaestra,
                estadoActual:'registrada', historial:[], ultimoRastreo:null, fecha:hoy(), ts:Date.now() };
   writeGuia(guia);
-  writePedido({...ped, guiaId:guia.id, estado: ped.estado==='entregado'?ped.estado:'enviado', tsEstado:Date.now()});
+  writePedido(limpiarBackorderPorEnvio({...ped, guiaId:guia.id, estado: ped.estado==='entregado'?ped.estado:'enviado', tsEstado:Date.now()}));
   toast(esMaestra?'Guía maestra registrada — pedido marcado como Enviado':esEntregaLocal?'Entrega local registrada — pedido marcado como Enviado':'Guía registrada — pedido marcado como Enviado');
   cerrarModal('modal-guia');
   if(currentPage==='guias') renderGuias();
@@ -7854,7 +7864,7 @@ function confirmarImportarGuias(){
     const guia={ id:uid(), pedidoId:ped.id, numero:it.guiaNum, transportadora:'interrapidisimo',
                  notas:'Importada', estadoActual:'registrada', historial:[], ultimoRastreo:null, fecha:hoy(), ts:Date.now() };
     writeGuia(guia);
-    writePedido({...ped, guiaId:guia.id, estado: ped.estado==='entregado'?ped.estado:'enviado', tsEstado:Date.now()});
+    writePedido(limpiarBackorderPorEnvio({...ped, guiaId:guia.id, estado: ped.estado==='entregado'?ped.estado:'enviado', tsEstado:Date.now()}));
     ok++;
   });
   toast(`${ok} guía(s) importadas — pedidos marcados como Enviado`);
@@ -8264,7 +8274,7 @@ function confirmarPDFGuias(){
     writeGuia(guia);
     if(it.pedidoId){
       const ped = getPedidos().find(p=>p.id===it.pedidoId);
-      if(ped) writePedido({...ped, guiaId:guia.id, estado:'enviado', tsEstado:Date.now()});
+      if(ped) writePedido(limpiarBackorderPorEnvio({...ped, guiaId:guia.id, estado:'enviado', tsEstado:Date.now()}));
     }
     guardadas++;
   });
@@ -8666,7 +8676,7 @@ function _aplicarResultadoRastreo(guia, result, opts){
         pedSync.devolucionIngresada = false;
         if(!silent) toast('Guía en devolución. El pedido quedó "En devolución" — ingresa las unidades al inventario cuando el par llegue físicamente a la oficina.', 8000);
       }
-      writePedido(pedSync);
+      writePedido(limpiarBackorderPorEnvio(pedSync));
     }
   }
   return estadoGuiaNorm;
