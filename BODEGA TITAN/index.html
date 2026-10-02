@@ -2088,8 +2088,30 @@ function initListeners() {
   }, onListenerError);
 }
 
+// Un pedido que ya salió (guía, enviado, entregado, novedad, devolución o
+// cancelado) no puede seguir "por reponer". Corrige los que quedaron pegados
+// por cualquier vía (edición manual, rastreo, importaciones).
+function sanearBackordersObsoletos(){
+  if(!isAdmin()) return;
+  const cerrados=['enviado','entregado','novedad','en_devolucion','cancelado'];
+  getPedidos().filter(p=>p.backorderPendiente && (p.guiaId || cerrados.includes(p.estado)))
+    .forEach(p=>writePedido({...limpiarBackorderPorEnvio(p), backorderManual:false}));
+}
+const REPOSICIONES_TTL_MS=12*60*60*1000;
+// Las reposiciones registradas se limpian solas pasadas 12 horas.
+function limpiarReposicionesViejas(){
+  if(!isAdmin()) return;
+  const limite=Date.now()-REPOSICIONES_TTL_MS;
+  const viejas=getAlertas().filter(a=>a.tipo==='reposicion_backorder' && (a.ts||0)<limite);
+  viejas.forEach(a=>{ if(USE_FIREBASE && REF.alertas) REF.alertas.child(a.id).remove(); });
+  if(viejas.length) localAlertas=localAlertas.filter(a=>!viejas.includes(a));
+}
+function mantenimientoBackorders(){ sanearBackordersObsoletos(); limpiarReposicionesViejas(); }
+
 function onDataReady() {
   document.getElementById('loading-overlay').style.display = 'none';
+  setTimeout(mantenimientoBackorders, 3000);
+  setInterval(mantenimientoBackorders, 10*60*1000);
   initCiudades();
 
   // ═══ LIMPIAR ADMINS DUPLICADOS ═══
@@ -4899,7 +4921,7 @@ function renderAlertas(){
   // Reposiciones recientes: registro PERMANENTE de qué pedido/cliente se cubrió
   // cada vez que llegó stock (no solo el aviso del momento). Queda visible aquí
   // aunque hayan pasado días, para no tener que buscar pedido por pedido.
-  const reposiciones=getAlertas().filter(a=>a.tipo==='reposicion_backorder' &&
+  const reposiciones=getAlertas().filter(a=>a.tipo==='reposicion_backorder' && (Date.now()-(a.ts||0))<REPOSICIONES_TTL_MS &&
     (!searchQ || (a.cliente||'').toLowerCase().includes(searchQ) || (a.productoNombre||'').toLowerCase().includes(searchQ) || (a.vendedorNombre||'').toLowerCase().includes(searchQ))
   ).slice(0,40);
   const el=document.getElementById('alertas-content');
@@ -4907,9 +4929,9 @@ function renderAlertas(){
   // "Reposiciones recientes" SIEMPRE se muestra (con aviso vacío si aún no hay
   // ninguna) — así no parece que la función no existe cuando todavía no se ha
   // cubierto ningún backorder desde que se agregó este registro.
-  let html=`<div style="margin-bottom:24px"><div class="section-title mb-16" style="color:var(--success)"><i class="bi bi-box-seam-fill"></i> Reposiciones recientes — quién se cubrió al llegar stock${reposiciones.length?` (${reposiciones.length})`:''}</div>`;
+  let html=`<div style="margin-bottom:24px"><div class="section-title mb-16" style="color:var(--success)"><i class="bi bi-box-seam-fill"></i> Reposiciones recientes — quién se cubrió al llegar stock (últimas 12 h)${reposiciones.length?` (${reposiciones.length})`:''}</div>`;
   if(!reposiciones.length){
-    html+=`<div class="card" style="padding:24px;text-align:center;color:var(--muted);font-size:13px"><i class="bi bi-inbox" style="font-size:22px;display:block;margin-bottom:8px"></i>Todavía no se ha cubierto ningún pedido "por reponer" desde que se activó este registro.<br>La próxima vez que una entrada de stock cubra un pedido en espera, va a aparecer aquí.</div></div>`;
+    html+=`<div class="card" style="padding:24px;text-align:center;color:var(--muted);font-size:13px"><i class="bi bi-inbox" style="font-size:22px;display:block;margin-bottom:8px"></i>No hay reposiciones en las últimas 12 horas (este listado se limpia solo).<br>Cuando una entrada de stock cubra un pedido en espera, va a aparecer aquí.</div></div>`;
   } else {
     html+=`<div class="card" style="padding:0;max-height:340px;overflow-y:auto">${reposiciones.map(a=>`
         <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)">
