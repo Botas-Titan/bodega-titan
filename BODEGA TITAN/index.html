@@ -2503,7 +2503,12 @@ function getStockDisponible(p, v) {
 function startAutoSync(){
   if(autoSyncInterval) clearInterval(autoSyncInterval);
   if(!USE_FIREBASE) return;
-  autoSyncInterval=setInterval(function(){
+  // Antes se re-descargaba TODO el catálogo (con fotos, ~2.7 MB) cada 10 s en
+  // cada dispositivo, además del listener en vivo. Eso era lo que más lentitud
+  // causaba. Ahora el listener en vivo mantiene todo al día, y solo se fuerza
+  // una lectura cuando la pestaña vuelve a estar visible (los móviles congelan
+  // los listeners en segundo plano).
+  const resync=function(){
     window.lastInventarioSync=Date.now();
     REF.prods.once('value', snap=>{
       const val=snap.val();
@@ -2512,7 +2517,13 @@ function startAutoSync(){
       const indicador=document.getElementById('sync-indicator-time');
       if(indicador) indicador.textContent='Actualizado hace unos segundos';
     });
-  },10000);
+  };
+  if(!window._resyncVisibilidadOn){
+    window._resyncVisibilidadOn=true;
+    document.addEventListener('visibilitychange',()=>{ if(!document.hidden && window._resyncFn) window._resyncFn(); });
+  }
+  window._resyncFn=resync;
+  autoSyncInterval=setInterval(resync,5*60*1000);
 }
 
 function syncAhora(){
@@ -2688,7 +2699,15 @@ function navigate(page) {
   if(page==='compras')         renderCompras();
 }
 
+// Los listeners de Firebase disparan refreshPage() muchas veces seguidas (al
+// cargar, en cada rastreo, en cada pedido). Re-dibujar tablas grandes cada vez
+// congelaba la app, así que agrupamos las llamadas cercanas en UNA sola.
+let _refreshTimer=null;
 function refreshPage() {
+  if(_refreshTimer) return;
+  _refreshTimer=setTimeout(()=>{ _refreshTimer=null; _refreshPageAhora(); }, 150);
+}
+function _refreshPageAhora() {
   if (!CU) return;
   if (currentPage==='dashboard')    renderDashboard();
   else if (currentPage==='productos')    renderProductos();
@@ -7190,9 +7209,15 @@ function renderAdminPedidos(){
           <button class="btn btn-sm btn-outline" onclick="limpiarFiltroFechaRango()"><i class="bi bi-x-lg"></i> Quitar rango</button>
         </div>`
       : '';
+  // Paginación: dibujar miles de filas a la vez volvía lenta la pantalla. Se
+  // muestran de a 50 y el límite vuelve a 50 cuando cambian los filtros.
+  const _sig=[filtroEstado,filtroVend,filtroPago,filtroBuscar,filtroFechaDesde,filtroFechaHasta,_soloBackorder].join('|');
+  if(_sig!==_adminPedSig){ _adminPedSig=_sig; _adminPedLimite=50; }
+  const totalPedidosFiltrados=pedidos.length;
+  const guiaPorPedido=new Map(); getGuias().forEach(g=>{ if(g.pedidoId && !guiaPorPedido.has(g.pedidoId)) guiaPorPedido.set(g.pedidoId,g); });
   let html=banner+`<div class="card"><div class="table-wrap"><table><thead><tr><th style="width:44px;text-align:center">#</th><th>Fecha</th><th>Producto</th><th>Cliente</th><th>Ciudad</th><th>Pago</th><th>Precio</th><th>Vendedor</th><th>Guía</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>`;
-  pedidos.forEach((ped,idx)=>{
-    const guia=getGuias().find(g=>g.pedidoId===ped.id);
+  pedidos.slice(0,_adminPedLimite).forEach((ped,idx)=>{
+    const guia=guiaPorPedido.get(ped.id);
     const precioBadge=ped.precioBajo
       ?`<div class="badge badge-warning" style="font-size:10px;margin-top:2px" title="Precio bajo el registrado"><i class="bi bi-exclamation-triangle-fill"></i> Bajo</div>`
       :ped.precioAlto
@@ -7236,9 +7261,14 @@ function renderAdminPedidos(){
       </div></td>
     </tr>`;
   });
-  html+='</tbody></table></div></div>';
+  html+='</tbody></table></div>';
+  if(totalPedidosFiltrados>_adminPedLimite){
+    html+=`<div style="text-align:center;padding:14px;border-top:1px solid var(--border)"><div style="font-size:12px;color:var(--muted);margin-bottom:8px">Mostrando ${_adminPedLimite} de ${totalPedidosFiltrados} pedidos</div><button class="btn btn-outline btn-sm" onclick="_adminPedLimite+=50;renderAdminPedidos()">Mostrar 50 más</button> <button class="btn btn-outline btn-sm" onclick="_adminPedLimite=999999;renderAdminPedidos()">Mostrar todos</button></div>`;
+  }
+  html+='</div>';
   el.innerHTML=html;
 }
+let _adminPedLimite=50, _adminPedSig='';
 
 function verDetallePedido(id){
   const ped=getPedidos().find(p=>p.id===id);
@@ -7983,7 +8013,8 @@ function renderGuiasTabla(){
     return;
   }
 
-  let rows=guias.map(g=>({g, ped:getPedidos().find(p=>p.id===g.pedidoId)}));
+  const pedPorId=new Map(); getPedidos().forEach(p=>pedPorId.set(p.id,p));
+  let rows=guias.map(g=>({g, ped:pedPorId.get(g.pedidoId)}));
   if(_guiasFiltroEstado==='en_bodega')  rows=rows.filter(r=>estadoGuiaUI(r.g)==='en_oficina');
   else if(_guiasFiltroEstado==='enviado')  rows=rows.filter(r=>{const u=estadoGuiaUI(r.g);return u==='en_transito'||u==='registrada';});
   else if(_guiasFiltroEstado==='novedad')  rows=rows.filter(r=>r.g.estadoActual==='novedad');
@@ -7995,7 +8026,10 @@ function renderGuiasTabla(){
     cont.innerHTML=`<div class="empty"><div class="empty-icon"><i class="bi bi-truck" style="font-size:38px;color:var(--muted)"></i></div><h3>${guias.length?'Sin guías con ese filtro':'Aún no hay guías registradas'}</h3>${!guias.length?'<div style="font-size:13px;color:var(--muted);margin-top:6px">Asigna guías desde <strong>Todos los Pedidos</strong> o con el botón <strong>Registrar Guía</strong>.</div>':''}</div>`;
     return;
   }
-  cont.innerHTML=`<table><thead><tr><th>Guía</th><th>Cliente</th><th>Producto</th><th>Vendedor</th><th>Transportadora</th><th>Estado rastreo</th><th>Últ. rastreo</th><th>Acciones</th></tr></thead><tbody>${rows.map(({g,ped})=>{
+  const _sigG=[_guiasFiltroEstado,q].join('|');
+  if(_sigG!==_guiasSig){ _guiasSig=_sigG; _guiasLimite=50; }
+  const totalRowsGuias=rows.length;
+  cont.innerHTML=`<table><thead><tr><th>Guía</th><th>Cliente</th><th>Producto</th><th>Vendedor</th><th>Transportadora</th><th>Estado rastreo</th><th>Últ. rastreo</th><th>Acciones</th></tr></thead><tbody>${rows.slice(0,_guiasLimite).map(({g,ped})=>{
     // Badge basado en estadoActual de la guía (fuente de verdad del rastreo)
     const eu=estadoGuiaUI(g);
     const esDevol=eu==='devuelta';
@@ -8026,8 +8060,12 @@ function renderGuiasTabla(){
         ${isAdmin()?`<button class="btn-icon" title="Eliminar pedido y guía" style="color:var(--danger)" onclick="eliminarPedidoGuia('${g.id}','${ped?ped.id:''}')"><i class="bi bi-trash-fill"></i></button>`:''}
       </div></td>
     </tr>`;
-  }).join('')}</tbody></table>`;
+  }).join('')}</tbody></table>`
+  + (totalRowsGuias>_guiasLimite
+    ? `<div style="text-align:center;padding:14px;border-top:1px solid var(--border)"><div style="font-size:12px;color:var(--muted);margin-bottom:8px">Mostrando ${_guiasLimite} de ${totalRowsGuias} guías</div><button class="btn btn-outline btn-sm" onclick="_guiasLimite+=50;renderGuiasTabla()">Mostrar 50 más</button> <button class="btn btn-outline btn-sm" onclick="_guiasLimite=999999;renderGuiasTabla()">Mostrar todas</button></div>`
+    : '');
 }
+let _guiasLimite=50, _guiasSig='';
 
 function eliminarPedidoGuia(guiaId, pedidoId){
   const msg = guiaId
