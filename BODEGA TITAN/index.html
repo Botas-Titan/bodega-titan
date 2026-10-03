@@ -971,7 +971,8 @@ textarea{resize:vertical}
             <option value="en_devolucion">En devolución</option>
             <option value="cancelado">Cancelado</option>
           </select>
-          <button type="button" id="btn-filtro-backorder" onclick="toggleFiltroBackorder()" title="Ver solo pedidos con pares vendidos sin stock físico (por reponer)" style="display:inline-flex;align-items:center;gap:5px;font-size:13px;padding:6px 9px;border:1px solid #fca5a5;border-radius:8px;background:#fff;color:#dc2626;cursor:pointer;font-weight:600">
+          <button type="button" id="btn-toggle-backorder" data-admin onclick="toggleBackorderActivo()" title="Activar o apagar la venta sin stock físico (por reponer) en BODEGA 1" style="display:inline-flex;align-items:center;gap:5px;font-size:13px;padding:6px 9px;border:1px solid #86efac;border-radius:8px;background:#dcfce7;color:#166534;cursor:pointer;font-weight:600"></button>
+          <button type="button" id="btn-filtro-backorder"onclick="toggleFiltroBackorder()" title="Ver solo pedidos con pares vendidos sin stock físico (por reponer)" style="display:inline-flex;align-items:center;gap:5px;font-size:13px;padding:6px 9px;border:1px solid #fca5a5;border-radius:8px;background:#fff;color:#dc2626;cursor:pointer;font-weight:600">
             <i class="bi bi-exclamation-octagon-fill"></i> Por reponer <span id="badge-count-backorder" style="display:none;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700">0</span>
           </button>
           <select id="filter-admin-vendedor" onchange="renderAdminPedidos()" title="Filtrar por vendedor" style="width:auto;font-size:13px;padding:6px 9px;border:1px solid var(--border);border-radius:8px">
@@ -1741,7 +1742,11 @@ const REF = firebaseInitOk ? {
   compras : db.ref('titanbotas/compras'),
   version : db.ref('titanbotas/config/appVersion'),
   autoRastreo : db.ref('titanbotas/config/lastAutoRastreoTs'),
+  backorderCfg: db.ref('titanbotas/config/backorderActivo'),
 } : {};
+// Interruptor global (solo admin): permite o no vender sin stock físico ("por
+// reponer") en BODEGA 1. Por defecto activo. Se sincroniza en tiempo real.
+let backorderActivo = true;
 
 // ── Local data cache (filled by real-time listeners or localStorage) ──
 let localProds   = [];
@@ -2081,6 +2086,11 @@ function initListeners() {
 
   // Alertas de stock (backorders cubiertos, ventas sin stock, transacciones
   // abortadas...): dato secundario, no participa en checkReady.
+  REF.backorderCfg.on('value', snap => {
+    backorderActivo = snap.val() !== false;
+    actualizarBotonBackorder();
+  }, onListenerError);
+
   REF.alertas.on('value', snap => {
     const val = snap.val();
     localAlertas = val ? Object.values(val).sort((a,b)=>(b.ts||0)-(a.ts||0)) : [];
@@ -5293,7 +5303,7 @@ setInterval(tickComprasElapsed,30000);
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
 function toast(msg,ms=3200){const c=document.getElementById('toast-wrap'),el=document.createElement('div');el.className='toast';el.textContent=msg;c.appendChild(el);setTimeout(()=>el.remove(),ms);}
 function updateBadges(){
-  const prods=getProds().filter(p=>bodegaPermiteBackorder(p.bodega));
+  const prods=getProds().filter(p=>esBodegaUno(p.bodega));
   let n=0;
   prods.forEach(p=>p.variantes.forEach(v=>{if((v.stockActual||0)<=(v.stockMinimo||0))n++;}));
   n+=getEstancados(7).filter(({p})=>prods.find(x=>x.id===p.id)).length;
@@ -5460,7 +5470,7 @@ function onPedVarChange(preservarEntrada){
   // pares y el botón "Agregar al carrito" y mostramos aviso de no disponible.
   if(!bodegaPermiteBackorder(p.bodega) && stock<=0){
     document.getElementById('ped-var-g2').style.display='none';
-    disp.innerHTML=`<div style="background:#fee2e2;border:1px solid #ef4444;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px">${fotoHtml}<div style="flex:1"><strong style="color:#991b1b"><i class="bi bi-x-octagon-fill"></i> No disponible</strong><div style="font-size:12px;color:#991b1b">Talla ${v.talla} · ${v.color} — producto de <strong>${p.bodega||'esta bodega'}</strong> sin stock. No se puede pedir ni dejar "por reponer".</div></div><span style="font-size:18px;color:#ef4444"><i class="bi bi-slash-circle"></i></span></div>`;
+    disp.innerHTML=`<div style="background:#fee2e2;border:1px solid #ef4444;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px">${fotoHtml}<div style="flex:1"><strong style="color:#991b1b"><i class="bi bi-x-octagon-fill"></i> No disponible</strong><div style="font-size:12px;color:#991b1b">Talla ${v.talla} · ${v.color} — producto de <strong>${p.bodega||'esta bodega'}</strong> sin stock. ${esBodegaUno(p.bodega)?'"Por reponer" está apagado: solo se venden unidades disponibles.':'No se puede pedir ni dejar "por reponer".'}</div></div><span style="font-size:18px;color:#ef4444"><i class="bi bi-slash-circle"></i></span></div>`;
     return;
   }
   // BACKORDER (solo BODEGA 1): el selector de pares y el botón "Agregar al
@@ -5722,7 +5732,7 @@ function agregarAlCarrito(){
   // BODEGA 2 y PROMOCIÓNES: no admiten backorder. No se puede pedir más de lo que
   // hay en físico. Si no alcanza el stock, se bloquea (red de seguridad + UI).
   if(!bodegaPermiteBackorder(p.bodega) && cantidad > Math.max(0, disponible)){
-    toast(`⛔ ${p.nombre} (${p.bodega||'esta bodega'}) solo tiene ${Math.max(0,disponible)} disponible(s). No admite "por reponer".`, 5000);
+    toast(`⛔ ${p.nombre} (${p.bodega||'esta bodega'}) solo tiene ${Math.max(0,disponible)} disponible(s). ${esBodegaUno(p.bodega)?'"Por reponer" está apagado.':'No admite "por reponer".'}`, 5000);
     return;
   }
   // BACKORDER (solo BODEGA 1): ya NO se bloquea por falta de stock. Si se piden
@@ -9163,7 +9173,7 @@ function renderPickerProductos(){
     const imgHtml=fotoPortada
       ? `<div class="prod-card-img" style="background:#fff;padding:0"><img src="${fotoPortada}" alt="${p.nombre}" style="width:100%;height:100%;object-fit:cover;${sinStock?'filter:grayscale(.7);opacity:.7':''}"></div>`
       : `<div class="prod-card-img" style="background:${bg}"><i class="bi ${icon}" style="color:${sinStock?'#94a3b8':'#6366f1'}"></i></div>`;
-    return `<div class="prod-card${sinStock?' sin-stock':''}${promoBloqueado?' no-disponible':''}" ${promoBloqueado?`onclick="toast('Producto sin stock en una bodega que no admite por reponer (BODEGA 2 / PROMOCIÓNES). No hay disponibilidad.',4000)" style="cursor:not-allowed;opacity:.6"`:`onclick="seleccionarProductoPicker('${p.id}')"`}>
+    return `<div class="prod-card${sinStock?' sin-stock':''}${promoBloqueado?' no-disponible':''}" ${promoBloqueado?`onclick="toast('Producto sin stock y no se admite por reponer (apagado o bodega sin esa función). No hay disponibilidad.',4000)" style="cursor:not-allowed;opacity:.6"`:`onclick="seleccionarProductoPicker('${p.id}')"`}>
       ${imgHtml}
       <div class="prod-card-body">
         <div class="prod-card-name">${p.nombre}</div>
@@ -9856,7 +9866,28 @@ function esBodegaPromocion(bodega){ return _normTxt(bodega).includes('PROMOC'); 
 // PROMOCIÓNES y BODEGA 2 NO admiten pedidos sin stock físico: si el stock está
 // en 0 el par no se puede seleccionar ni pasar a "por reponer". Una bodega vacía
 // (dato legado) se trata como BODEGA 1 por compatibilidad.
-function bodegaPermiteBackorder(bodega){ const t=_normTxt(bodega); return t==='' || t.includes('BODEGA 1'); }
+function esBodegaUno(bodega){ const t=_normTxt(bodega); return t==='' || t.includes('BODEGA 1'); }
+// Además de ser BODEGA 1, el administrador debe tener activo el interruptor
+// global "Por reponer". Apagado, solo se venden las unidades disponibles.
+function bodegaPermiteBackorder(bodega){ return backorderActivo && esBodegaUno(bodega); }
+function actualizarBotonBackorder(){
+  const b=document.getElementById('btn-toggle-backorder'); if(!b) return;
+  b.innerHTML=backorderActivo
+    ? '<i class="bi bi-toggle-on"></i> Vender sin stock: ACTIVO'
+    : '<i class="bi bi-toggle-off"></i> Vender sin stock: APAGADO';
+  b.style.background=backorderActivo?'#dcfce7':'#fee2e2';
+  b.style.color=backorderActivo?'#166534':'#991b1b';
+  b.style.borderColor=backorderActivo?'#86efac':'#fca5a5';
+}
+function toggleBackorderActivo(){
+  if(!isAdmin()) return;
+  const nuevo=!backorderActivo;
+  const msg=nuevo
+    ? '¿Activar "por reponer"? Las colaboradoras podrán subir pedidos de BODEGA 1 aunque el stock esté en 0 (quedan "por reponer").'
+    : '¿Apagar "por reponer"? Desde ahora solo se podrán subir pedidos con las unidades disponibles. Los pedidos ya "por reponer" siguen igual.';
+  if(!confirm(msg)) return;
+  REF.backorderCfg.set(nuevo).then(()=>toast(nuevo?'Por reponer ACTIVADO':'Por reponer APAGADO — solo unidades disponibles'));
+}
 
 // Bodegas fijas del negocio. Se muestran SIEMPRE en los filtros aunque estén
 // vacías, para que el admin pueda navegarlas y asignar productos a ellas.
