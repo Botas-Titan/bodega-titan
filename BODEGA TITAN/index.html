@@ -7193,6 +7193,8 @@ function renderAdminPedidos(){
     ? `${_filtroFmt(filtroFechaDesde)} → ${_filtroFmt(filtroFechaHasta)}`
     : filtroFechaDesde ? `desde ${_filtroFmt(filtroFechaDesde)}`
     : filtroFechaHasta ? `hasta ${_filtroFmt(filtroFechaHasta)}` : '';
+  const _sig=[filtroEstado,filtroVend,filtroPago,filtroBuscar,filtroFechaDesde,filtroFechaHasta,_soloBackorder].join('|');
+  if(_sig!==_adminPedSig){ _adminPedSig=_sig; _adminPedLimite=50; }
   const btnGuias=document.getElementById('btn-guias-masivas');
   if(btnGuias) btnGuias.style.display=pedidos.length?'inline-flex':'none';
   const el=document.getElementById('admin-pedidos-content');
@@ -7211,8 +7213,6 @@ function renderAdminPedidos(){
       : '';
   // Paginación: dibujar miles de filas a la vez volvía lenta la pantalla. Se
   // muestran de a 50 y el límite vuelve a 50 cuando cambian los filtros.
-  const _sig=[filtroEstado,filtroVend,filtroPago,filtroBuscar,filtroFechaDesde,filtroFechaHasta,_soloBackorder].join('|');
-  if(_sig!==_adminPedSig){ _adminPedSig=_sig; _adminPedLimite=50; }
   const totalPedidosFiltrados=pedidos.length;
   const guiaPorPedido=new Map(); getGuias().forEach(g=>{ if(g.pedidoId && !guiaPorPedido.has(g.pedidoId)) guiaPorPedido.set(g.pedidoId,g); });
   let html=banner+`<div class="card"><div class="table-wrap"><table><thead><tr><th style="width:44px;text-align:center">#</th><th>Fecha</th><th>Producto</th><th>Cliente</th><th>Ciudad</th><th>Pago</th><th>Precio</th><th>Vendedor</th><th>Guía</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>`;
@@ -8022,12 +8022,12 @@ function renderGuiasTabla(){
   else if(_guiasFiltroEstado==='devuelto')  rows=rows.filter(r=>r.g.estadoActual==='devuelta');
   if(q){const _qd=q.replace(/\D/g,'');rows=rows.filter(r=>{const c=r.ped?.cliente||{};return (r.g.numero||'').toLowerCase().includes(q)||(c.nombre||'').toLowerCase().includes(q)||(_qd&&(c.telefono||'').replace(/\D/g,'').includes(_qd))||(c.ciudad||'').toLowerCase().includes(q)||(c.cedula||'').includes(q)||(c.direccion||'').toLowerCase().includes(q);});}
   rows.sort((a,b)=>(b.g.ts||0)-(a.g.ts||0));
+  const _sigG=[_guiasFiltroEstado,q].join('|');
+  if(_sigG!==_guiasSig){ _guiasSig=_sigG; _guiasLimite=50; }
   if(!rows.length){
     cont.innerHTML=`<div class="empty"><div class="empty-icon"><i class="bi bi-truck" style="font-size:38px;color:var(--muted)"></i></div><h3>${guias.length?'Sin guías con ese filtro':'Aún no hay guías registradas'}</h3>${!guias.length?'<div style="font-size:13px;color:var(--muted);margin-top:6px">Asigna guías desde <strong>Todos los Pedidos</strong> o con el botón <strong>Registrar Guía</strong>.</div>':''}</div>`;
     return;
   }
-  const _sigG=[_guiasFiltroEstado,q].join('|');
-  if(_sigG!==_guiasSig){ _guiasSig=_sigG; _guiasLimite=50; }
   const totalRowsGuias=rows.length;
   cont.innerHTML=`<table><thead><tr><th>Guía</th><th>Cliente</th><th>Producto</th><th>Vendedor</th><th>Transportadora</th><th>Estado rastreo</th><th>Últ. rastreo</th><th>Acciones</th></tr></thead><tbody>${rows.slice(0,_guiasLimite).map(({g,ped})=>{
     // Badge basado en estadoActual de la guía (fuente de verdad del rastreo)
