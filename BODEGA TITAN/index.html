@@ -1184,6 +1184,7 @@ textarea{resize:vertical}
     <div style="display:grid;grid-template-columns:1fr;gap:12px">
       <div class="form-group"><label>Descripción</label><input type="text" id="p-desc" placeholder="Descripción breve"></div>
     </div>
+    <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;margin-bottom:12px;cursor:pointer;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px"><input type="checkbox" id="p-por-reponer" style="margin-top:2px"><span><strong>Siempre permitir "por reponer"</strong> (solo BODEGA 1)<br><span style="color:var(--muted);font-size:12px">Aunque el interruptor general de Todos los Pedidos esté apagado, este producto sí se podrá vender con stock 0.</span></span></label>
     <div class="form-group">
       <label>Foto de portada (referencia)</label>
       <div style="display:flex;align-items:center;gap:14px">
@@ -3282,7 +3283,7 @@ function renderVariantPhotoThumb(rowId){
 }
 
 function abrirModalProducto(){editingProdId=null;document.getElementById('mp-title').textContent='Nuevo Producto';['p-nombre','p-cat','p-depto','p-prov','p-desc'].forEach(id=>document.getElementById(id).value='');document.getElementById('p-bodega').value='BODEGA 1 🔵';document.getElementById('p-tipo').value='botas';currentProductPhoto=null;renderProductPhotoThumb();document.getElementById('var-container').innerHTML='';varCnt=0;addVarRow();abrirModal('modal-producto');}
-function editarProducto(id){const p=getProds().find(x=>x.id===id);if(!p)return;editingProdId=id;document.getElementById('mp-title').textContent='Editar Producto';document.getElementById('p-nombre').value=p.nombre;document.getElementById('p-tipo').value=p.tipo||(esCategoriaComboPermitida(p.categoria)?'accesorios':'botas');document.getElementById('p-cat').value=p.categoria||'';const selBod=document.getElementById('p-bodega');selBod.value=p.bodega||'BODEGA 1 🔵';if(selBod.selectedIndex<0)selBod.value=esBodegaPromocion(p.bodega)?'PROMOCIÓNES 🔴':'BODEGA 1 🔵';document.getElementById('p-depto').value=p.departamento||'';document.getElementById('p-prov').value=p.proveedor||'';document.getElementById('p-desc').value=p.descripcion||'';currentProductPhoto=p.foto||null;renderProductPhotoThumb();document.getElementById('var-container').innerHTML='';varCnt=0;p.variantes.forEach(v=>addVarRow(v));abrirModal('modal-producto');}
+function editarProducto(id){const p=getProds().find(x=>x.id===id);if(!p)return;editingProdId=id;document.getElementById('mp-title').textContent='Editar Producto';document.getElementById('p-nombre').value=p.nombre;document.getElementById('p-tipo').value=p.tipo||(esCategoriaComboPermitida(p.categoria)?'accesorios':'botas');document.getElementById('p-cat').value=p.categoria||'';const selBod=document.getElementById('p-bodega');selBod.value=p.bodega||'BODEGA 1 🔵';if(selBod.selectedIndex<0)selBod.value=esBodegaPromocion(p.bodega)?'PROMOCIÓNES 🔴':'BODEGA 1 🔵';document.getElementById('p-depto').value=p.departamento||'';document.getElementById('p-prov').value=p.proveedor||'';document.getElementById('p-desc').value=p.descripcion||'';document.getElementById('p-por-reponer').checked=!!p.permitePorReponer;currentProductPhoto=p.foto||null;renderProductPhotoThumb();document.getElementById('var-container').innerHTML='';varCnt=0;p.variantes.forEach(v=>addVarRow(v));abrirModal('modal-producto');}
 
 function addVarRow(data={}) {
   const id='vr'+varCnt++,el=document.createElement('div');
@@ -3325,7 +3326,7 @@ function guardarProducto() {
       _stockTocado:stockTocado
     });
   });
-  const base={nombre,tipo:document.getElementById('p-tipo').value,categoria:document.getElementById('p-cat').value.trim(),bodega:document.getElementById('p-bodega').value.trim(),departamento:document.getElementById('p-depto').value.trim(),proveedor:document.getElementById('p-prov').value.trim(),descripcion:document.getElementById('p-desc').value.trim(),foto:currentProductPhoto||''};
+  const base={nombre,tipo:document.getElementById('p-tipo').value,categoria:document.getElementById('p-cat').value.trim(),bodega:document.getElementById('p-bodega').value.trim(),departamento:document.getElementById('p-depto').value.trim(),proveedor:document.getElementById('p-prov').value.trim(),descripcion:document.getElementById('p-desc').value.trim(),foto:currentProductPhoto||'',permitePorReponer:!!document.getElementById('p-por-reponer').checked};
   if(editingProdId){
     guardarProductoEdicionAtomica(editingProdId, base, variantes);
     toast('Producto actualizado');
@@ -3356,7 +3357,7 @@ function guardarProductoEdicionAtomica(pid, base, variantesForm){
     const cur = current || {id:pid};
     cur.nombre=base.nombre; cur.tipo=base.tipo; cur.categoria=base.categoria; cur.bodega=base.bodega;
     cur.departamento=base.departamento; cur.proveedor=base.proveedor;
-    cur.descripcion=base.descripcion; cur.foto=base.foto;
+    cur.descripcion=base.descripcion; cur.foto=base.foto; cur.permitePorReponer=base.permitePorReponer;
     const serverVars = (current && current.variantes) ? current.variantes : [];
     const mismaVariante=(a,b)=>
       String(a.talla||'').trim().toLowerCase()===String(b.talla||'').trim().toLowerCase() &&
@@ -5468,7 +5469,7 @@ function onPedVarChange(preservarEntrada){
   // BODEGA 2 y PROMOCIÓNES: NO admiten backorder. Si no hay stock físico, el par
   // no se puede seleccionar (no hay disponibilidad). Ocultamos el selector de
   // pares y el botón "Agregar al carrito" y mostramos aviso de no disponible.
-  if(!bodegaPermiteBackorder(p.bodega) && stock<=0){
+  if(!bodegaPermiteBackorder(p.bodega,p) && stock<=0){
     document.getElementById('ped-var-g2').style.display='none';
     disp.innerHTML=`<div style="background:#fee2e2;border:1px solid #ef4444;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px">${fotoHtml}<div style="flex:1"><strong style="color:#991b1b"><i class="bi bi-x-octagon-fill"></i> No disponible</strong><div style="font-size:12px;color:#991b1b">Talla ${v.talla} · ${v.color} — producto de <strong>${p.bodega||'esta bodega'}</strong> sin stock. ${esBodegaUno(p.bodega)?'"Por reponer" está apagado: solo se venden unidades disponibles.':'No se puede pedir ni dejar "por reponer".'}</div></div><span style="font-size:18px;color:#ef4444"><i class="bi bi-slash-circle"></i></span></div>`;
     return;
@@ -5731,7 +5732,7 @@ function agregarAlCarrito(){
   const cantidad=paresSeleccionados||1;
   // BODEGA 2 y PROMOCIÓNES: no admiten backorder. No se puede pedir más de lo que
   // hay en físico. Si no alcanza el stock, se bloquea (red de seguridad + UI).
-  if(!bodegaPermiteBackorder(p.bodega) && cantidad > Math.max(0, disponible)){
+  if(!bodegaPermiteBackorder(p.bodega,p) && cantidad > Math.max(0, disponible)){
     toast(`⛔ ${p.nombre} (${p.bodega||'esta bodega'}) solo tiene ${Math.max(0,disponible)} disponible(s). ${esBodegaUno(p.bodega)?'"Por reponer" está apagado.':'No admite "por reponer".'}`, 5000);
     return;
   }
@@ -6120,7 +6121,7 @@ function aplicarSalidaStockPedido(ped, callback, opts){
           // Con permitirNeg (venta sin stock) el stock puede quedar en 0 (backorder).
           // EXCEPCIÓN: BODEGA 2 y PROMOCIÓNES nunca admiten backorder, así que se
           // abortan si no hay stock físico suficiente, aunque permitirNeg sea true.
-          const itNoBackorder = !bodegaPermiteBackorder(it.bodegaAlMomento || current.bodega);
+          const itNoBackorder = !bodegaPermiteBackorder(it.bodegaAlMomento || current.bodega, current);
           if((!permitirNeg || itNoBackorder) && (v.stockActual||0) < it.cantidad){
             motivoFallo = itNoBackorder
               ? `${it.talla||'?'}/${it.color||'?'} de "${it.productoNombre||''}" (${it.bodegaAlMomento||current.bodega||'bodega sin backorder'}): no hay stock suficiente y no admite "por reponer".`
@@ -9165,7 +9166,7 @@ function renderPickerProductos(){
     const stock=p.variantes.reduce((s,v)=>s+(v.stockActual||0),0);
     const sinStock=stock===0;
     // BODEGA 2 / PROMOCIÓNES sin stock = no disponible (no backorder): no seleccionable.
-    const promoBloqueado = !bodegaPermiteBackorder(p.bodega) && sinStock;
+    const promoBloqueado = !bodegaPermiteBackorder(p.bodega,p) && sinStock;
     const bg=CAT_COLORS[i%CAT_COLORS.length];
     const icon=getCatIcon(p.categoria||'');
     const tallas=[...new Set(p.variantes.filter(v=>(v.stockActual||0)>0).map(v=>v.talla))].slice(0,4).join(', ');
@@ -9869,7 +9870,8 @@ function esBodegaPromocion(bodega){ return _normTxt(bodega).includes('PROMOC'); 
 function esBodegaUno(bodega){ const t=_normTxt(bodega); return t==='' || t.includes('BODEGA 1'); }
 // Además de ser BODEGA 1, el administrador debe tener activo el interruptor
 // global "Por reponer". Apagado, solo se venden las unidades disponibles.
-function bodegaPermiteBackorder(bodega){ return backorderActivo && esBodegaUno(bodega); }
+// Un producto con "permitePorReponer" se exceptúa del interruptor apagado.
+function bodegaPermiteBackorder(bodega, prod){ return esBodegaUno(bodega) && (backorderActivo || !!(prod && prod.permitePorReponer)); }
 function actualizarBotonBackorder(){
   const b=document.getElementById('btn-toggle-backorder'); if(!b) return;
   b.innerHTML=backorderActivo
