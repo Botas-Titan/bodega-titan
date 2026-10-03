@@ -770,6 +770,13 @@ textarea{resize:vertical}
                   <input type="file" id="ped-externa-foto-input" accept="image/*" style="display:none" onchange="handleExternaPhoto(event)">
                   <div style="font-size:11px;color:var(--muted);margin-top:4px">Sin foto no se puede agregar la bota externa al carrito.</div>
                 </div>
+                <div class="form-group">
+                  <label style="font-size:12px;font-weight:600">Talla *</label>
+                  <select id="ped-externa-talla">
+                    <option value="">Selecciona la talla…</option>
+                    <option>34</option><option>35</option><option>36</option><option>37</option><option>38</option><option>39</option><option>40</option><option>41</option><option>42</option><option>43</option><option>44</option><option>45</option><option>46</option>
+                  </select>
+                </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                   <div class="form-group">
                     <label style="font-size:12px;font-weight:600">Cantidad de pares</label>
@@ -5682,13 +5689,16 @@ function resetExternaForm(){
   _externaFoto=null;
   ['ped-externa-nombre','ped-externa-precio'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const pares=document.getElementById('ped-externa-pares'); if(pares) pares.value='1';
+  const tallaSel=document.getElementById('ped-externa-talla'); if(tallaSel) tallaSel.value='';
   renderExternaFotoThumb();
 }
 function agregarExternaAlCarrito(){
   const nombre=(document.getElementById('ped-externa-nombre')?.value||'').trim();
   const cantidad=parseInt(document.getElementById('ped-externa-pares')?.value,10)||1;
   const precio=parseFloat(document.getElementById('ped-externa-precio')?.value)||0;
+  const talla=(document.getElementById('ped-externa-talla')?.value||'').trim();
   if(!nombre){toast('Escribe el modelo o descripción de la bota externa');return;}
+  if(!talla){toast('Selecciona la talla de la bota externa');document.getElementById('ped-externa-talla')?.focus();return;}
   if(!_externaFoto){toast('Debes subir una foto del producto para continuar');return;}
   if(!precio){toast('Ingresa el precio de venta');return;}
   if(cantidad<1){toast('La cantidad de pares debe ser al menos 1');return;}
@@ -5696,7 +5706,7 @@ function agregarExternaAlCarrito(){
     externa:true,
     pid:null, vid:null,
     productoNombre:nombre,
-    talla:'—', color:'externa', sku:'',
+    talla, color:'externa', sku:'',
     cantidad,
     precio,
     precioRegistrado:0,
@@ -5834,7 +5844,7 @@ function renderCarrito(){
     const externaBadge=item.externa
       ?`<span class="badge badge-purple" style="font-size:9px;margin-left:4px"><i class="bi bi-box-arrow-up-right"></i> externa</span>`:'';
     const lineaTitulo=item.externa
-      ?`${item.productoNombre}${externaBadge}`
+      ?`${item.productoNombre} — T${item.talla}${externaBadge}`
       :`${item.productoNombre} — T${item.talla}/${item.color}${alertaBajo}${alertaAlto}`;
 
     return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
@@ -7255,7 +7265,7 @@ function verDetallePedido(id){
           ${fotoHtml}
           <div style="flex:1;min-width:0">
             <div style="font-weight:700">${it.productoNombre}${it.externa?` <span class="badge badge-purple" style="font-size:9px"><i class="bi bi-box-arrow-up-right"></i> externa</span>`:''}</div>
-            <div style="font-size:12px;color:var(--muted)">${it.externa?`Bota externa (fuera de inventario)`:`Talla ${it.talla} / ${it.color}${it.sku?' · '+it.sku:''}`} · ${it.cantidad} par${it.cantidad>1?'es':''}</div>
+            <div style="font-size:12px;color:var(--muted)">${it.externa?`Bota externa (fuera de inventario) · Talla ${it.talla||'—'}`:`Talla ${it.talla} / ${it.color}${it.sku?' · '+it.sku:''}`} · ${it.cantidad} par${it.cantidad>1?'es':''}</div>
             ${it.backorder&&(it.faltante||0)>0?`<div style="font-size:11px;margin-top:3px"><span class="badge" style="background:#dc2626;color:#fff;font-size:9px;padding:2px 6px;font-weight:700"><i class="bi bi-exclamation-octagon-fill"></i> POR REPONER: ${it.faltante} par(es) sin stock físico</span></div>`:''}
             ${it.precioVenta?`<div style="font-size:12px"><i class="bi bi-tag-fill"></i> ${fmtM(it.precioVenta)}${it.precioBajo?` <span class="badge badge-warning" style="font-size:9px"><i class="bi bi-exclamation-triangle-fill"></i> bajo</span>`:it.precioAlto?` <span style="font-size:9px;color:#3b82f6">↑ alto</span>`:''}</div>`:''}
           </div>
