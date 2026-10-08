@@ -146,7 +146,8 @@ td{padding:11px 13px;vertical-align:middle}
 .badge-pendiente{background:#fde68a;color:#78350f}
 .badge-aprobado{background:#d1fae5;color:#065f46}
 .badge-en-oficina{background:#cffafe;color:#155e75}
-.badge-en-devolucion{background:#ffedd5;color:#9a3412}
+.badge-en-devolucion{background:#fee2e2;color:#b91c1c}
+.badge-devol-revisada{background:#dc2626;color:#fff;font-weight:700}
 .order-step{display:flex;gap:12px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--border)}
 .order-step:last-child{border-bottom:none}
 .step-num{width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -431,8 +432,8 @@ textarea{resize:vertical}
         <div class="stat-card"><div class="stat-icon" style="background:#ede9fe;color:#6366f1"><i class="bi bi-grid-fill"></i></div><div class="stat-label">Productos</div><div class="stat-value" id="s-prods">0</div><div class="stat-sub">Referencias activas</div></div>
         <div class="stat-card"><div class="stat-icon" style="background:#dbeafe;color:#3b82f6"><i class="bi bi-boot"></i></div><div class="stat-label">Stock Botas</div><div class="stat-value" id="s-stock-botas">0</div><div class="stat-sub">Pares en inventario</div></div>
         <div class="stat-card"><div class="stat-icon" style="background:#fef3c7;color:#d97706"><i class="bi bi-bag-fill"></i></div><div class="stat-label">Stock Accesorios</div><div class="stat-value" id="s-stock-acc">0</div><div class="stat-sub">Bolsos y billeteras</div></div>
-        <div class="stat-card clickable" style="position:relative" onclick="verEntradasHoy()"><button class="btn-icon" style="position:absolute;top:10px;right:10px;color:#10b981;background:#dcfce7" onclick="event.stopPropagation();verEntradasHoy()" title="Ver detalle de entradas de hoy"><i class="bi bi-eye-fill"></i></button><div class="stat-icon" style="background:#dcfce7;color:#10b981"><i class="bi bi-arrow-down-circle-fill"></i></div><div class="stat-label">Entradas hoy</div><div class="stat-value text-success" id="s-entradas">0</div><div class="stat-sub">Unidades recibidas · <span style="color:var(--primary)">ver detalle</span></div></div>
-        <div class="stat-card clickable" style="position:relative" onclick="verSalidasHoy()"><button class="btn-icon" style="position:absolute;top:10px;right:10px;color:#ef4444;background:#fee2e2" onclick="event.stopPropagation();verSalidasHoy()" title="Ver detalle de salidas de hoy"><i class="bi bi-eye-fill"></i></button><div class="stat-icon" style="background:#fee2e2;color:#ef4444"><i class="bi bi-arrow-up-circle-fill"></i></div><div class="stat-label">Salidas hoy</div><div class="stat-value text-danger" id="s-salidas">0</div><div class="stat-sub">Clic para ver detalle</div></div>
+        <div class="stat-card clickable" style="position:relative" onclick="verEntradasHoy()"><button class="btn-icon" style="position:absolute;top:10px;right:10px;color:#10b981;background:#dcfce7" onclick="event.stopPropagation();verEntradasHoy()" title="Ver detalle de entradas de hoy"><i class="bi bi-eye-fill"></i></button><div class="stat-icon" style="background:#dcfce7;color:#10b981"><i class="bi bi-arrow-down-circle-fill"></i></div><div class="stat-label" id="s-entradas-lbl">Entradas hoy</div><div class="stat-value text-success" id="s-entradas">0</div><div class="stat-sub">Unidades recibidas · <span style="color:var(--primary)">ver detalle</span></div></div>
+        <div class="stat-card clickable" style="position:relative" onclick="verSalidasHoy()"><button class="btn-icon" style="position:absolute;top:10px;right:10px;color:#ef4444;background:#fee2e2" onclick="event.stopPropagation();verSalidasHoy()" title="Ver detalle de salidas de hoy"><i class="bi bi-eye-fill"></i></button><div class="stat-icon" style="background:#fee2e2;color:#ef4444"><i class="bi bi-arrow-up-circle-fill"></i></div><div class="stat-label" id="s-salidas-lbl">Salidas hoy</div><div class="stat-value text-danger" id="s-salidas">0</div><div class="stat-sub">Clic para ver detalle</div></div>
         <div class="stat-card clickable" style="position:relative;border-left:4px solid #dc2626" onclick="irAPorReponer()" title="Ver todos los pedidos por reponer"><div class="stat-icon" style="background:#fee2e2;color:#dc2626"><i class="bi bi-exclamation-octagon-fill"></i></div><div class="stat-label">Por reponer</div><div class="stat-value" style="color:#dc2626" id="s-por-reponer">0</div><div class="stat-sub">Pares vendidos sin stock · <span style="color:var(--primary)">ver</span></div></div>
       </div>
       <div class="stats-row stats-2 mb-16" id="dash-admin-valores">
@@ -446,9 +447,9 @@ textarea{resize:vertical}
           <div><div class="card-title" id="dash-chart-title">Flujo de los últimos 7 días</div><div class="card-sub">Entradas vs Salidas</div></div>
           <div class="flex gap-8" style="align-items:center;flex-wrap:wrap">
             <div class="flex gap-8" style="align-items:center">
-              <input type="date" id="dash-desde" onchange="renderDashChart()" style="width:auto;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
+              <input type="date" id="dash-desde" onchange="renderDashChart();actualizarTarjetasES()" style="width:auto;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
               <span style="font-size:12px;color:var(--muted)">→</span>
-              <input type="date" id="dash-hasta" onchange="renderDashChart()" style="width:auto;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
+              <input type="date" id="dash-hasta" onchange="renderDashChart();actualizarTarjetasES()" style="width:auto;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
               <button class="btn btn-outline btn-sm" onclick="resetDashRango()">7 días</button>
             </div>
             <button class="btn btn-danger btn-sm" onclick="exportarInformeDia()"><i class="bi bi-file-earmark-pdf-fill"></i> Informe del día</button>
@@ -1120,7 +1121,7 @@ textarea{resize:vertical}
       <div class="stats-row stats-4 mb-16">
         <div class="stat-card"><div class="stat-icon" style="background:#ede9fe;color:#6366f1"><i class="bi bi-cash-coin"></i></div><div class="stat-label">Gasto</div><div class="stat-value" id="publi-s-gasto">—</div><div class="stat-sub" id="publi-s-gasto-sub">en el período</div></div>
         <div class="stat-card"><div class="stat-icon" style="background:#dbeafe;color:#3b82f6"><i class="bi bi-chat-dots-fill"></i></div><div class="stat-label">Mensajes</div><div class="stat-value" id="publi-s-msg">—</div><div class="stat-sub" id="publi-s-msg-sub">$/conversación: —</div></div>
-        <div class="stat-card"><div class="stat-icon" style="background:#dcfce7;color:#10b981"><i class="bi bi-graph-up"></i></div><div class="stat-label">Utilidad (entregado)</div><div class="stat-value" id="publi-s-util">—</div><div class="stat-sub" id="publi-s-util-sub">en ruta: —</div></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#dcfce7;color:#10b981"><i class="bi bi-graph-up"></i></div><div class="stat-label" title="Venta en ruta − costo en ruta − gasto">Utilidad esperada (en ruta)</div><div class="stat-value" id="publi-s-util">—</div><div class="stat-sub" id="publi-s-util-sub">real entregado: —</div></div>
         <div class="stat-card"><div class="stat-icon" style="background:#fee2e2;color:#ef4444"><i class="bi bi-speedometer2"></i></div><div class="stat-label">ROAS entregado</div><div class="stat-value" id="publi-s-roas">—</div><div class="stat-sub" id="publi-s-roas-sub">en ruta: —</div></div>
       </div>
 
@@ -1355,6 +1356,24 @@ textarea{resize:vertical}
 </div>
 
 <!-- MODAL SALIDAS HOY -->
+<!-- Código de seguridad para editar productos (lo envía n8n al celular del dueño) -->
+<div class="modal-overlay" id="modal-codigo-edicion">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div><div class="modal-title">🔐 Código de seguridad</div><div class="modal-sub" id="ce-sub">Para editar productos se necesita un código enviado al celular del propietario.</div></div>
+      <button class="btn-icon" onclick="cancelarCodigoEdicion()">✕</button>
+    </div>
+    <div style="padding:4px 2px 12px">
+      <button class="btn btn-outline" id="ce-btn-enviar" style="width:100%;margin-bottom:12px" onclick="solicitarCodigoEdicion()"><i class="bi bi-send-fill"></i> Enviar código al 311 ••• 0169</button>
+      <div class="form-group"><label>Código recibido</label><input type="text" id="ce-codigo" inputmode="numeric" maxlength="8" autocomplete="one-time-code" placeholder="••••••" style="text-align:center;font-size:22px;letter-spacing:6px" onkeydown="if(event.key==='Enter')verificarCodigoEdicion()"></div>
+      <div id="ce-msg" style="font-size:12px;color:var(--muted);min-height:16px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="cancelarCodigoEdicion()">Cancelar</button>
+      <button class="btn btn-primary" id="ce-btn-verificar" onclick="verificarCodigoEdicion()"><i class="bi bi-unlock-fill"></i> Verificar</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="modal-salidas-hoy">
   <div class="modal modal-lg">
     <div class="modal-header">
@@ -2310,7 +2329,64 @@ function removeProd(id) {
 // Oculta/muestra un producto a las vendedoras. Cuando oculto=true, las vendedoras
 // no lo ven en el catálogo ni pueden pedirlo; el admin sí lo sigue viendo (marcado
 // "OCULTO"). Escribe SOLO el campo `oculto` para no pisar cambios de stock en curso.
+// ── Código de seguridad para editar productos ────────────────────────────
+// La app pide un código de un solo uso que n8n envía al celular del propietario
+// (WhatsApp/SMS). La generación y la verificación del código ocurren en n8n; la
+// app solo muestra el cuadro y recuerda la validación CODIGO_EDICION_TTL_MS.
+// Mientras N8N_WEBHOOK_CODIGO_EDICION esté vacío el control queda DESACTIVADO
+// (todo funciona como antes) — se activa pegando la URL del webhook de n8n.
+// Contrato (POST JSON):  {accion:'solicitar', usuario, motivo}      → {ok:true}
+//                        {accion:'verificar', usuario, codigo}      → {ok:true} | {ok:false}
+let N8N_WEBHOOK_CODIGO_EDICION='';
+const CODIGO_EDICION_TTL_MS=30*60*1000;
+const CODIGO_EDICION_KEY='titan_codigo_edicion_ok';
+let _codigoEdicionCb=null;
+function codigoEdicionActivo(){ return !!N8N_WEBHOOK_CODIGO_EDICION; }
+function codigoEdicionVigente(){
+  try{ const t=Number(sessionStorage.getItem(CODIGO_EDICION_KEY)||0); return t>0 && (Date.now()-t)<CODIGO_EDICION_TTL_MS; }catch(e){ return false; }
+}
+// Devuelve true si se puede continuar YA. Si falta el código devuelve false, abre
+// el cuadro y, cuando se verifique, vuelve a ejecutar `retomar`.
+function exigirCodigoEdicion(retomar){
+  if(!isAdmin() || !codigoEdicionActivo() || codigoEdicionVigente()) return true;
+  _codigoEdicionCb=retomar||null;
+  const c=document.getElementById('ce-codigo'); if(c) c.value='';
+  const m=document.getElementById('ce-msg'); if(m) m.textContent='';
+  abrirModal('modal-codigo-edicion');
+  return false;
+}
+function cancelarCodigoEdicion(){ _codigoEdicionCb=null; cerrarModal('modal-codigo-edicion'); }
+async function _llamarN8nCodigo(payload){
+  const r=await fetch(N8N_WEBHOOK_CODIGO_EDICION,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,usuario:CU?.nombre||'',ts:Date.now()})});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  return r.json().catch(()=>({}));
+}
+async function solicitarCodigoEdicion(){
+  const msg=document.getElementById('ce-msg'), btn=document.getElementById('ce-btn-enviar');
+  if(btn) btn.disabled=true; if(msg) msg.textContent='Enviando código…';
+  try{
+    const r=await _llamarN8nCodigo({accion:'solicitar',motivo:'editar-producto'});
+    if(msg) msg.textContent=r.ok===false?'No se pudo enviar el código. Intenta de nuevo.':'Código enviado. Revisa tu celular (vale 5 minutos).';
+  }catch(e){ if(msg) msg.textContent='No se pudo contactar el servicio de códigos. Intenta de nuevo.'; }
+  setTimeout(()=>{ if(btn) btn.disabled=false; },15000); // evita spam de mensajes
+}
+async function verificarCodigoEdicion(){
+  const codigo=(document.getElementById('ce-codigo')?.value||'').trim();
+  const msg=document.getElementById('ce-msg');
+  if(!/^\d{4,8}$/.test(codigo)){ if(msg) msg.textContent='Escribe el código numérico que recibiste.'; return; }
+  if(msg) msg.textContent='Verificando…';
+  try{
+    const r=await _llamarN8nCodigo({accion:'verificar',codigo});
+    if(r.ok===true){
+      try{ sessionStorage.setItem(CODIGO_EDICION_KEY,String(Date.now())); }catch(e){}
+      const cb=_codigoEdicionCb; _codigoEdicionCb=null;
+      cerrarModal('modal-codigo-edicion'); toast('Código correcto — edición habilitada por 30 minutos');
+      if(typeof cb==='function') cb();
+    } else if(msg) msg.textContent='Código incorrecto o vencido.';
+  }catch(e){ if(msg) msg.textContent='No se pudo verificar. Intenta de nuevo.'; }
+}
 function toggleVisibilidadProducto(id){
+  if(!exigirCodigoEdicion(()=>toggleVisibilidadProducto(id))) return;
   if(escrituraBloqueada()) return;
   const p=getProds().find(x=>x.id===id); if(!p) return;
   const nuevo=!p.oculto;
@@ -2794,14 +2870,11 @@ function renderDashboard() {
       if(s<=(v.stockMinimo||0)) low.push({producto:p,variante:v});
     });
   });
-  const einHoy=movs.filter(m=>esIngresoBodega(m)&&m.fecha===today).reduce((s,m)=>s+m.cantidad,0);
-  const soutHoy=movs.filter(m=>m.tipo==='salida'&&m.fecha===today).reduce((s,m)=>s+m.cantidad,0);
   document.getElementById('s-prods').textContent=prods.length;
   const elStockBotas=document.getElementById('s-stock-botas'); if(elStockBotas) elStockBotas.textContent=fmtN(stockBotas);
   const elStockAcc=document.getElementById('s-stock-acc'); if(elStockAcc) elStockAcc.textContent=fmtN(stockAcc);
   const elStockTotal=document.getElementById('s-stock'); if(elStockTotal) elStockTotal.textContent=fmtN(totalStock);
-  document.getElementById('s-entradas').textContent=fmtN(einHoy);
-  document.getElementById('s-salidas').textContent=fmtN(soutHoy);
+  actualizarTarjetasES();
   // Total de pares POR REPONER en TODO el sistema (todas las órdenes en ese estado).
   const paresPorReponer=getPedidos().filter(p=>p.backorderPendiente)
     .reduce((s,p)=>s+(Array.isArray(p.items)?p.items.filter(i=>i.backorder).reduce((a,i)=>a+(i.faltante||0),0):0),0);
@@ -3047,11 +3120,32 @@ function renderDashChart() {
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0}}}}});
 }
 function resetDashRango(){
-  const h=hoy(),d=new Date();d.setDate(d.getDate()-6);
+  // Vacío = últimos 7 días en la gráfica y "hoy" en las tarjetas de entradas/salidas.
   const de=document.getElementById('dash-desde'),ha=document.getElementById('dash-hasta');
-  if(de) de.value=d.toISOString().slice(0,10);
-  if(ha) ha.value=h;
+  if(de) de.value='';
+  if(ha) ha.value='';
   renderDashChart();
+  actualizarTarjetasES();
+}
+// Rango de fechas que usan las tarjetas "Entradas/Salidas" y sus detalles.
+// Sin fecha elegida en el dashboard = solo hoy. Con una fecha (o rango) = ese día/rango.
+function dashRangoFechas(){
+  const d=document.getElementById('dash-desde')?.value||'', h=document.getElementById('dash-hasta')?.value||'';
+  if(!d && !h){ const t=hoy(); return {desde:t,hasta:t,custom:false,label:'hoy'}; }
+  let a=d||h, b=h||d; if(a>b){ const x=a; a=b; b=x; }
+  return {desde:a,hasta:b,custom:true,label:(a===b?fmtD(a):fmtD(a)+' → '+fmtD(b))};
+}
+function movEnRangoDash(m,r){ return m.fecha>=r.desde && m.fecha<=r.hasta; }
+function actualizarTarjetasES(){
+  const r=dashRangoFechas(), movs=getMovs();
+  const ein=movs.filter(m=>esIngresoBodega(m)&&movEnRangoDash(m,r)).reduce((s,m)=>s+m.cantidad,0);
+  const sou=movs.filter(m=>m.tipo==='salida'&&movEnRangoDash(m,r)).reduce((s,m)=>s+m.cantidad,0);
+  const e=document.getElementById('s-entradas'), sa=document.getElementById('s-salidas');
+  if(e) e.textContent=fmtN(ein);
+  if(sa) sa.textContent=fmtN(sou);
+  const le=document.getElementById('s-entradas-lbl'), ls=document.getElementById('s-salidas-lbl');
+  if(le) le.textContent=r.custom?'Entradas · '+r.label:'Entradas hoy';
+  if(ls) ls.textContent=r.custom?'Salidas · '+r.label:'Salidas hoy';
 }
 
 function renderDashBodegaChart(){
@@ -3309,7 +3403,7 @@ function renderVariantPhotoThumb(rowId){
 }
 
 function abrirModalProducto(){editingProdId=null;document.getElementById('mp-title').textContent='Nuevo Producto';['p-nombre','p-cat','p-depto','p-prov','p-desc'].forEach(id=>document.getElementById(id).value='');document.getElementById('p-bodega').value='BODEGA 1 🔵';document.getElementById('p-tipo').value='botas';currentProductPhoto=null;renderProductPhotoThumb();document.getElementById('var-container').innerHTML='';varCnt=0;addVarRow();abrirModal('modal-producto');}
-function editarProducto(id){const p=getProds().find(x=>x.id===id);if(!p)return;editingProdId=id;document.getElementById('mp-title').textContent='Editar Producto';document.getElementById('p-nombre').value=p.nombre;document.getElementById('p-tipo').value=p.tipo||(esCategoriaComboPermitida(p.categoria)?'accesorios':'botas');document.getElementById('p-cat').value=p.categoria||'';const selBod=document.getElementById('p-bodega');selBod.value=p.bodega||'BODEGA 1 🔵';if(selBod.selectedIndex<0)selBod.value=esBodegaPromocion(p.bodega)?'PROMOCIÓNES 🔴':'BODEGA 1 🔵';document.getElementById('p-depto').value=p.departamento||'';document.getElementById('p-prov').value=p.proveedor||'';document.getElementById('p-desc').value=p.descripcion||'';document.getElementById('p-por-reponer').checked=!!p.permitePorReponer;currentProductPhoto=p.foto||null;renderProductPhotoThumb();document.getElementById('var-container').innerHTML='';varCnt=0;p.variantes.forEach(v=>addVarRow(v));abrirModal('modal-producto');}
+function editarProducto(id){if(!exigirCodigoEdicion(()=>editarProducto(id)))return;const p=getProds().find(x=>x.id===id);if(!p)return;editingProdId=id;document.getElementById('mp-title').textContent='Editar Producto';document.getElementById('p-nombre').value=p.nombre;document.getElementById('p-tipo').value=p.tipo||(esCategoriaComboPermitida(p.categoria)?'accesorios':'botas');document.getElementById('p-cat').value=p.categoria||'';const selBod=document.getElementById('p-bodega');selBod.value=p.bodega||'BODEGA 1 🔵';if(selBod.selectedIndex<0)selBod.value=esBodegaPromocion(p.bodega)?'PROMOCIÓNES 🔴':'BODEGA 1 🔵';document.getElementById('p-depto').value=p.departamento||'';document.getElementById('p-prov').value=p.proveedor||'';document.getElementById('p-desc').value=p.descripcion||'';document.getElementById('p-por-reponer').checked=!!p.permitePorReponer;currentProductPhoto=p.foto||null;renderProductPhotoThumb();document.getElementById('var-container').innerHTML='';varCnt=0;p.variantes.forEach(v=>addVarRow(v));abrirModal('modal-producto');}
 
 function addVarRow(data={}) {
   const id='vr'+varCnt++,el=document.createElement('div');
@@ -3327,6 +3421,8 @@ function addVarRow(data={}) {
 }
 
 function guardarProducto() {
+  // Editar (no crear) exige el código también al guardar, por si el cuadro quedó abierto.
+  if(editingProdId && !exigirCodigoEdicion(()=>guardarProducto())) return;
   const nombre=document.getElementById('p-nombre').value.trim();
   if(!nombre){toast('El nombre es requerido');return;}
   const rows=document.querySelectorAll('#var-container .variant-row');
@@ -3567,6 +3663,7 @@ function verVariantes(id) {
 // ── LIGHTBOX (vista ampliada de fotos) ──
 // ── SUBIR FOTO RÁPIDA DESDE LA TABLA DE PRODUCTOS ──
 function subirFotoProductoQuick(prodId){
+  if(!exigirCodigoEdicion(()=>subirFotoProductoQuick(prodId))) return;
   const p=getProds().find(x=>x.id===prodId);
   if(!p){toast('Producto no encontrado');return;}
   const input=document.createElement('input');
@@ -3612,7 +3709,7 @@ function abrirLightbox(prodId,which){
 }
 
 let confirmCb=null;
-function pedirEliminarProd(id){const p=getProds().find(x=>x.id===id);document.getElementById('confirm-msg').textContent=`¿Eliminar "${p?.nombre}"?`;confirmCb=()=>{removeProd(id);toast('Producto eliminado');};abrirModal('modal-confirm');}
+function pedirEliminarProd(id){if(!exigirCodigoEdicion(()=>pedirEliminarProd(id)))return;const p=getProds().find(x=>x.id===id);document.getElementById('confirm-msg').textContent=`¿Eliminar "${p?.nombre}"?`;confirmCb=()=>{removeProd(id);toast('Producto eliminado');};abrirModal('modal-confirm');}
 function runConfirm(){if(confirmCb){confirmCb();confirmCb=null;}cerrarModal('modal-confirm');}
 
 // ════════════════════════════════════════
@@ -4733,11 +4830,11 @@ function renderHistorial(){
       ?'<span class="badge" style="background:#dc2626;color:#fff;font-weight:700"><i class="bi bi-exclamation-octagon-fill"></i> Por reponer</span>'
       :m.tipo==='entrada'
       ?(m.subtipo==='restitucion'?'<span class="badge badge-warning"><i class="bi bi-x-circle-fill"></i> Cancelado</span>'
-        :m.subtipo==='devolucion'?(m.revisada?'<span class="badge" style="background:#16a34a;color:#fff;font-weight:700"><i class="bi bi-check-circle-fill"></i> Devolución revisada</span>':'<span class="badge badge-info">↩ Devolución</span>')
+        :m.subtipo==='devolucion'?(m.revisada?'<span class="badge badge-devol-revisada"><i class="bi bi-check-circle-fill"></i> Devolución revisada</span>':'<span class="badge badge-danger">↩ Devolución</span>')
         :'<span class="badge badge-success">⬇ Compra</span>')
       :'<span class="badge badge-danger">⬆ Salida</span>';
     const revBtn=(esDevol && _esAdminHist)
-      ?`<button class="btn-icon" title="${m.revisada?'Revisada — clic para desmarcar':'Marcar esta devolución como revisada (solo visual)'}" onclick="toggleRevisionMovimiento('${m.id}')" style="margin-left:6px;padding:2px 6px;font-size:11px;border:1px solid ${m.revisada?'#16a34a':'#cbd5e1'};border-radius:6px;background:${m.revisada?'#16a34a':'#fff'};color:${m.revisada?'#fff':'#64748b'};cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:4px;vertical-align:middle"><i class="bi bi-check-lg"></i> ${m.revisada?'Revisada':'Revisar'}</button>`
+      ?`<button class="btn-icon" title="${m.revisada?'Revisada — clic para desmarcar':'Marcar esta devolución como revisada (solo visual)'}" onclick="toggleRevisionMovimiento('${m.id}')" style="margin-left:6px;padding:2px 6px;font-size:11px;border:1px solid ${m.revisada?'#dc2626':'#cbd5e1'};border-radius:6px;background:${m.revisada?'#dc2626':'#fff'};color:${m.revisada?'#fff':'#64748b'};cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:4px;vertical-align:middle"><i class="bi bi-check-lg"></i> ${m.revisada?'Revisada':'Revisar'}</button>`
       :'';
     const signo=m.tipo==='entrada'?'+':m.tipo==='por_reponer'?'':'-';
     html+=`<tr${esDevol&&m.revisada?' style="background:#f0fdf4"':''}><td style="text-align:center;color:var(--muted);font-size:12px">${idx+1}</td><td style="white-space:nowrap">${fmtDT(m.fecha,m.ts)}</td><td style="white-space:nowrap">${tipoBadge}${revBtn}</td><td>${p?p.nombre:'<span class="text-muted">Eliminado</span>'}</td><td style="font-size:12px">${cliente||'—'}</td><td>${v?v.talla+'/'+v.color:'—'}</td><td><strong>${signo}${m.cantidad}</strong></td><td style="font-size:12px;color:var(--muted)">${m.referencia||'—'}</td><td style="font-size:12px;color:var(--muted)">${m.usuario||'—'}</td><td style="font-size:12px;color:var(--muted)">${m.notas||'—'}</td></tr>`;
@@ -4843,7 +4940,9 @@ function calcReportData(days){const prods=getProds(),movs=getMovs();
   const{desde,hasta}=getReportRango();
   const period=movs.filter(m=>m.fecha>=desde&&m.fecha<=hasta);const totalEnt=period.filter(esIngresoBodega).reduce((s,m)=>s+m.cantidad,0);const totalSal=period.filter(m=>m.tipo==='salida').reduce((s,m)=>s+m.cantidad,0);const valorVentas=period.filter(m=>m.tipo==='salida').reduce((sum,m)=>{const p=prods.find(x=>x.id===m.productoId),v=p?.variantes.find(x=>x.id===m.varianteId);return sum+m.cantidad*(v?.precio||0);},0);// Agrupar por PRODUCTO (sumar todas las variantes)
 const smap={};
-period.filter(m=>m.tipo==='salida').forEach(m=>{smap[m.productoId]=(smap[m.productoId]||0)+m.cantidad;});
+// Más vendidos: SOLO botas (bolsos y billeteras se excluyen del ranking).
+const _pidBota={}; prods.forEach(p=>{ _pidBota[p.id]=!esProductoAccesorio(p); });
+period.filter(m=>m.tipo==='salida'&&_pidBota[m.productoId]!==false).forEach(m=>{smap[m.productoId]=(smap[m.productoId]||0)+m.cantidad;});
 const topProductos=Object.entries(smap).map(([pid,qty])=>{
   const p=prods.find(x=>x.id===pid);
   const totalVal=period.filter(m=>m.tipo==='salida'&&m.productoId===pid).reduce((s,m)=>{
@@ -4985,6 +5084,14 @@ function renderAlertas(){
         </div>`).join('')}
       </div>
     </div>`;
+  }
+  const salSinPed=isAdmin()?getSalidasSinPedido().filter(m=>!searchQ || (getProds().find(x=>x.id===m.productoId)?.nombre||'').toLowerCase().includes(searchQ)):[];
+  if(salSinPed.length){
+    const _pr=getProds();
+    html=`<div style="margin-bottom:24px"><div class="section-title text-danger mb-16"><i class="bi bi-box-arrow-up"></i> Salidas de bodega SIN pedido — ${salSinPed.length}</div><div class="card"><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Producto</th><th>Variante</th><th>Cant.</th><th>Referencia / notas</th><th>Registró</th><th>Acción</th></tr></thead><tbody>${salSinPed.map(m=>{
+      const p=_pr.find(x=>x.id===m.productoId), v=p?.variantes.find(x=>x.id===m.varianteId);
+      return `<tr style="background:#fef2f2"><td style="white-space:nowrap">${fmtD(m.fecha)}${m.ts?' '+fmtT(m.ts):''}</td><td><strong>${p?.nombre||'Producto eliminado'}</strong></td><td>${v?v.talla+'/'+v.color:'—'}</td><td><span class="badge badge-danger">-${m.cantidad}</span></td><td style="font-size:12px;color:var(--muted)">${[m.referencia,m.notas].filter(Boolean).join(' · ')||'—'}</td><td style="font-size:12px">${m.usuario||'—'}</td><td><button class="btn btn-sm btn-outline" onclick="justificarSalidaSinPedido('${m.id}')"><i class="bi bi-check2-circle"></i> Justificar</button></td></tr>`;
+    }).join('')}</tbody></table></div></div></div>`+html;
   }
   if(sinStock.length) html+=`<div style="margin-bottom:24px"><div class="section-title text-danger mb-16"><i class="bi bi-x-circle-fill"></i> Sin Stock — ${sinStock.length} variante(s)</div><div class="card">${tblStock(sinStock,'zero')}</div></div>`;
   if(bajo.length) html+=`<div style="margin-bottom:24px"><div class="section-title text-warning mb-16"><i class="bi bi-exclamation-triangle-fill"></i> Stock Bajo — ${bajo.length} variante(s)</div><div class="card">${tblStock(bajo,'low')}</div></div>`;
@@ -5162,11 +5269,11 @@ function movFotoCellHtml(p,v){
   return `<div class="photo-cell"><div class="no-photo"><i class="bi bi-image"></i></div></div>`;
 }
 function verSalidasHoy() {
-  const today=hoy(), prods=getProds(), movs=getMovs();
-  const salidas=[...movs.filter(m=>m.tipo==='salida'&&m.fecha===today)].sort((a,b)=>(b.ts||0)-(a.ts||0));
-  document.getElementById('msh-fecha').textContent=fmtD(today)+' · '+salidas.length+' movimiento(s)';
+  const rg=dashRangoFechas(), prods=getProds(), movs=getMovs();
+  const salidas=[...movs.filter(m=>m.tipo==='salida'&&movEnRangoDash(m,rg))].sort((a,b)=>(b.ts||0)-(a.ts||0));
+  document.getElementById('msh-fecha').textContent=(rg.custom?rg.label:fmtD(rg.desde))+' · '+salidas.length+' movimiento(s)';
   if(!salidas.length){
-    document.getElementById('msh-content').innerHTML=`<div class="empty"><div class="empty-icon"><i class="bi bi-box-seam" style="font-size:38px;color:var(--muted)"></i></div><h3>Sin salidas hoy</h3><p class="text-muted" style="margin-top:6px">No se han registrado salidas en el día de hoy.</p></div>`;
+    document.getElementById('msh-content').innerHTML=`<div class="empty"><div class="empty-icon"><i class="bi bi-box-seam" style="font-size:38px;color:var(--muted)"></i></div><h3>Sin salidas ${rg.custom?'en esa fecha':'hoy'}</h3><p class="text-muted" style="margin-top:6px">No se han registrado salidas ${rg.custom?'en la fecha seleccionada':'en el día de hoy'}.</p></div>`;
   } else {
     let total=0, totalVal=0;
     let html=`<div class="table-wrap"><table><thead><tr><th></th><th>Producto</th><th>Variante</th><th>SKU</th><th>Cantidad</th><th>Hora</th><th>Referencia</th><th>Valor</th><th>Quién</th></tr></thead><tbody>`;
@@ -5181,7 +5288,7 @@ function verSalidasHoy() {
         <td style="font-family:monospace;font-size:11px">${v?.sku||'—'}</td>
         <td><span class="badge badge-danger">-${m.cantidad} uds</span></td>
         <td style="font-size:12px;color:var(--muted);white-space:nowrap">${fmtT(m.ts)||'—'}</td>
-        <td style="font-size:12px;color:var(--muted)">${m.referencia||'—'}</td>
+        <td style="font-size:12px;color:var(--muted)">${m.referencia||'—'}${esSalidaSinPedido(m)?' <span class="badge badge-danger" title="Esta salida no está relacionada a ningún pedido">SIN PEDIDO</span>':''}</td>
         <td style="font-size:12px">${val?fmtM(val):'—'}</td>
         <td style="font-size:12px;color:var(--muted)">${m.usuario||'—'}</td>
       </tr>`;
@@ -5196,11 +5303,11 @@ function verSalidasHoy() {
   abrirModal('modal-salidas-hoy');
 }
 function verEntradasHoy() {
-  const today=hoy(), prods=getProds(), movs=getMovs();
-  const entradas=[...movs.filter(m=>esIngresoBodega(m)&&m.fecha===today)].sort((a,b)=>(b.ts||0)-(a.ts||0));
-  document.getElementById('meh-fecha').textContent=fmtD(today)+' · '+entradas.length+' movimiento(s)';
+  const rg=dashRangoFechas(), prods=getProds(), movs=getMovs();
+  const entradas=[...movs.filter(m=>esIngresoBodega(m)&&movEnRangoDash(m,rg))].sort((a,b)=>(b.ts||0)-(a.ts||0));
+  document.getElementById('meh-fecha').textContent=(rg.custom?rg.label:fmtD(rg.desde))+' · '+entradas.length+' movimiento(s)';
   if(!entradas.length){
-    document.getElementById('meh-content').innerHTML=`<div class="empty"><div class="empty-icon"><i class="bi bi-box-seam" style="font-size:38px;color:var(--muted)"></i></div><h3>Sin entradas hoy</h3><p class="text-muted" style="margin-top:6px">No se han registrado entradas en el día de hoy.</p></div>`;
+    document.getElementById('meh-content').innerHTML=`<div class="empty"><div class="empty-icon"><i class="bi bi-box-seam" style="font-size:38px;color:var(--muted)"></i></div><h3>Sin entradas ${rg.custom?'en esa fecha':'hoy'}</h3><p class="text-muted" style="margin-top:6px">No se han registrado entradas ${rg.custom?'en la fecha seleccionada':'en el día de hoy'}.</p></div>`;
   } else {
     let total=0;
     let html=`<div class="table-wrap"><table><thead><tr><th></th><th>Producto</th><th>Variante</th><th>SKU</th><th>Cantidad</th><th>Hora</th><th>Origen</th><th>Referencia</th><th>Quién</th></tr></thead><tbody>`;
@@ -5329,9 +5436,36 @@ function tickComprasElapsed(){
 setInterval(tickComprasElapsed,30000);
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
 function toast(msg,ms=3200){const c=document.getElementById('toast-wrap'),el=document.createElement('div');el.className='toast';el.textContent=msg;c.appendChild(el);setTimeout(()=>el.remove(),ms);}
+// ── Salidas de bodega sin pedido ─────────────────────────────────────────
+// Toda salida de stock debe estar ligada a un pedido (movimiento con pedidoId).
+// Las que no lo están (salida manual, importación) salen en Alertas hasta que el
+// admin las justifique. Se excluyen las reposiciones a pedidos por reponer
+// (subtipo 'backorder'), que son parte del flujo normal, y todo lo anterior a la
+// fecha de activación para no inundar con histórico.
+const ALERTA_SALIDAS_DESDE='2026-10-08';
+function esSalidaSinPedido(m){
+  return !!m && m.tipo==='salida' && !m.pedidoId && m.subtipo!=='backorder'
+    && !m.sinPedidoOk && (m.fecha||'')>=ALERTA_SALIDAS_DESDE;
+}
+function getSalidasSinPedido(){
+  return getMovs().filter(esSalidaSinPedido).sort((a,b)=>(b.ts||0)-(a.ts||0));
+}
+function justificarSalidaSinPedido(movId){
+  if(!isAdmin()){ toast('Solo el administrador puede justificar salidas'); return; }
+  if(escrituraBloqueada()){ toast('Recarga la página (versión nueva)'); return; }
+  const motivo=(window.prompt('Motivo de esta salida sin pedido (ej. daño, muestra, ajuste de inventario):')||'').trim();
+  if(!motivo){ toast('Escribe un motivo para justificar la salida'); return; }
+  const i=localMovs.findIndex(m=>m.id===movId); if(i<0) return;
+  const upd={ sinPedidoOk:true, sinPedidoMotivo:motivo, sinPedidoPor:CU?.nombre||'', sinPedidoTs:Date.now() };
+  localMovs[i]={...localMovs[i], ...upd};
+  if(USE_FIREBASE && REF.movs) REF.movs.child(movId).update(upd).catch(e=>console.warn('justificar salida',e));
+  toast('Salida justificada');
+  updateBadges(); if(currentPage==='alertas') renderAlertas();
+}
 function updateBadges(){
   const prods=getProds().filter(p=>esBodegaUno(p.bodega));
   let n=0;
+  if(isAdmin()) n+=getSalidasSinPedido().length;
   prods.forEach(p=>p.variantes.forEach(v=>{if((v.stockActual||0)<=(v.stockMinimo||0))n++;}));
   n+=getEstancados(7).filter(({p})=>prods.find(x=>x.id===p.id)).length;
   const b=document.getElementById('badge-alertas');
@@ -6795,7 +6929,7 @@ function estadoBadgeVisual(ped){
   // Devolución YA revisada por el admin → letrero en VERDE (solo visual, no cambia
   // la lógica de la devolución). Se marca/desmarca con el chulito en la tabla.
   if(ef==='en_devolucion' && ped && ped.devolucionRevisada){
-    return '<span class="badge" style="background:#16a34a;color:#fff;font-weight:700"><i class="bi bi-check-circle-fill"></i> Devolución revisada</span>';
+    return '<span class="badge badge-devol-revisada"><i class="bi bi-check-circle-fill"></i> Devolución revisada</span>';
   }
   return estadoBadge(ef);
 }
@@ -7122,6 +7256,23 @@ function onFiltroFechaRangoChange(){
   renderAdminPedidos();
 }
 
+// Fechas del resumen de "Todos los Pedidos": escriben en el mismo filtro de fecha
+// de la página (así la tabla y los totales siempre muestran el mismo rango).
+function setResumenFecha(modo){
+  const fd=document.getElementById('filter-admin-fecha-desde'), fh=document.getElementById('filter-admin-fecha-hasta');
+  if(!fd||!fh) return;
+  const ymd=d=>d.toISOString().slice(0,10);
+  const hoyD=new Date(hoy()+'T12:00:00');
+  if(modo==='hoy'){ fd.value=hoy()+'T00:00'; fh.value=hoy()+'T00:00'; }
+  else if(modo==='7'){ const d=new Date(hoyD); d.setDate(d.getDate()-6); fd.value=ymd(d)+'T00:00'; fh.value=hoy()+'T00:00'; }
+  else if(modo==='mes'){ fd.value=hoy().slice(0,8)+'01T00:00'; fh.value=hoy()+'T00:00'; }
+  else if(modo==='todo'){ fd.value=''; fh.value=''; }
+  else {
+    const a=document.getElementById('ap-res-desde')?.value||'', b=document.getElementById('ap-res-hasta')?.value||'';
+    fd.value=a?a+'T00:00':''; fh.value=b?b+'T00:00':'';
+  }
+  renderAdminPedidos();
+}
 function limpiarFiltroFecha(){
   const fd=document.getElementById('filter-admin-fecha-desde'); if(fd) fd.value='';
   const fh=document.getElementById('filter-admin-fecha-hasta'); if(fh) fh.value='';
@@ -7189,6 +7340,28 @@ function renderAdminPedidos(){
       pedidos=pedidos.filter(p=> p.ts!=null ? p.ts<=hastaTs : p.fecha<=ymdHasta);
     }
   }
+  // Resumen de pedidos exitosos (entregados) y devoluciones. Sigue el rango de
+  // fechas y el vendedor elegidos; ignora el filtro de estado para mostrar ambos.
+  const aplicarFechaAdmin=(lista)=>{
+    if(!(filtroFechaDesde||filtroFechaHasta)) return lista;
+    const desdeTs=_filtroTsInicio(filtroFechaDesde);
+    const hastaTs=filtroFechaHasta
+      ? (_filtroTieneHora(filtroFechaHasta) ? _filtroTsInicio(filtroFechaHasta) : _filtroTsFinDia(filtroFechaHasta))
+      : null;
+    if(desdeTs!=null){ const y=_filtroYmd(filtroFechaDesde); lista=lista.filter(p=> p.ts!=null ? p.ts>=desdeTs : p.fecha>=y); }
+    if(hastaTs!=null){ const y=_filtroYmd(filtroFechaHasta); lista=lista.filter(p=> p.ts!=null ? p.ts<=hastaTs : p.fecha<=y); }
+    return lista;
+  };
+  const baseResumen=aplicarFechaAdmin(getPedidos().filter(p=>!filtroVend||p.vendedorNombre===filtroVend));
+  let nExitosos=0, nDevol=0, valExitosos=0, nResumenTotal=0;
+  baseResumen.forEach(p=>{
+    const ef=estadoEfectivo(p);
+    if(ef==='cancelado') return;
+    nResumenTotal++;
+    if(ef==='entregado'){ nExitosos++; valExitosos+=Number(p.precioVenta)||0; }
+    else if(ef==='en_devolucion') nDevol++;
+  });
+  const pctDevol=nResumenTotal?((nDevol/nResumenTotal)*100):0;
   const rotuloRango = (filtroFechaDesde && filtroFechaHasta)
     ? `${_filtroFmt(filtroFechaDesde)} → ${_filtroFmt(filtroFechaHasta)}`
     : filtroFechaDesde ? `desde ${_filtroFmt(filtroFechaDesde)}`
@@ -7198,7 +7371,23 @@ function renderAdminPedidos(){
   const btnGuias=document.getElementById('btn-guias-masivas');
   if(btnGuias) btnGuias.style.display=pedidos.length?'inline-flex':'none';
   const el=document.getElementById('admin-pedidos-content');
-  if(!pedidos.length){el.innerHTML=`<div class="card"><div class="empty"><div class="empty-icon"><i class="bi bi-bag-x" style="font-size:38px;color:var(--muted)"></i></div><h3>${_soloBackorder?'No hay pedidos por reponer 🎉':(filtroEstado||filtroVend||filtroPago||rotuloRango?'Sin pedidos con esos filtros'+(rotuloRango?' ('+rotuloRango+')':''):'No hay pedidos registrados')}</h3></div></div>`;return;}
+  const _vD=_filtroYmd(filtroFechaDesde), _vH=_filtroYmd(filtroFechaHasta);
+  const resumenHtml=`<div class="flex mb-8" style="gap:6px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:600;color:var(--muted)"><i class="bi bi-calendar-range"></i> Resumen por fecha:</span>
+      <input type="date" id="ap-res-desde" value="${_vD}" onchange="setResumenFecha()" style="width:auto;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
+      <span style="font-size:12px;color:var(--muted)">→</span>
+      <input type="date" id="ap-res-hasta" value="${_vH}" onchange="setResumenFecha()" style="width:auto;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
+      <button class="btn btn-outline btn-sm" onclick="setResumenFecha('hoy')">Hoy</button>
+      <button class="btn btn-outline btn-sm" onclick="setResumenFecha('7')">7 días</button>
+      <button class="btn btn-outline btn-sm" onclick="setResumenFecha('mes')">Este mes</button>
+      <button class="btn btn-outline btn-sm" onclick="setResumenFecha('todo')">Todo</button>
+    </div>
+    <div class="stats-row mb-16" id="ap-resumen" style="grid-template-columns:repeat(3,1fr)">
+      <div class="stat-card" style="border-left:4px solid #059669"><div class="stat-label">Pedidos exitosos (entregados)</div><div class="stat-value" style="color:#059669">${fmtN(nExitosos)}</div><div class="stat-sub">${fmtM(valExitosos)} · ${rotuloRango||'todo el historial'}</div></div>
+      <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-label">Devoluciones</div><div class="stat-value" style="color:#dc2626">${fmtN(nDevol)}</div><div class="stat-sub">${rotuloRango||'todo el historial'}</div></div>
+      <div class="stat-card" style="border-left:4px solid #6366f1"><div class="stat-label">% devolución</div><div class="stat-value" style="color:#6366f1">${pctDevol.toFixed(1)}%</div><div class="stat-sub">sobre ${fmtN(nResumenTotal)} pedidos no cancelados</div></div>
+    </div>`;
+  if(!pedidos.length){el.innerHTML=resumenHtml+`<div class="card"><div class="empty"><div class="empty-icon"><i class="bi bi-bag-x" style="font-size:38px;color:var(--muted)"></i></div><h3>${_soloBackorder?'No hay pedidos por reponer 🎉':(filtroEstado||filtroVend||filtroPago||rotuloRango?'Sin pedidos con esos filtros'+(rotuloRango?' ('+rotuloRango+')':''):'No hay pedidos registrados')}</h3></div></div>`;return;}
   const banner=rotuloRango
       ? `<div class="card mb-16" style="background:linear-gradient(135deg,#e0e7ff,#ede9fe);border:1px solid #c7d2fe;display:flex;align-items:center;justify-content:space-between;padding:12px 16px">
           <div style="display:flex;align-items:center;gap:10px">
@@ -7215,7 +7404,7 @@ function renderAdminPedidos(){
   // muestran de a 50 y el límite vuelve a 50 cuando cambian los filtros.
   const totalPedidosFiltrados=pedidos.length;
   const guiaPorPedido=new Map(); getGuias().forEach(g=>{ if(g.pedidoId && !guiaPorPedido.has(g.pedidoId)) guiaPorPedido.set(g.pedidoId,g); });
-  let html=banner+`<div class="card"><div class="table-wrap"><table><thead><tr><th style="width:44px;text-align:center">#</th><th>Fecha</th><th>Producto</th><th>Cliente</th><th>Ciudad</th><th>Pago</th><th>Precio</th><th>Vendedor</th><th>Guía</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>`;
+  let html=resumenHtml+banner+`<div class="card"><div class="table-wrap"><table><thead><tr><th style="width:44px;text-align:center">#</th><th>Fecha</th><th>Producto</th><th>Cliente</th><th>Ciudad</th><th>Pago</th><th>Precio</th><th>Vendedor</th><th>Guía</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>`;
   pedidos.slice(0,_adminPedLimite).forEach((ped,idx)=>{
     const guia=guiaPorPedido.get(ped.id);
     const precioBadge=ped.precioBajo
@@ -7250,7 +7439,7 @@ function renderAdminPedidos(){
       <td style="font-size:12px;white-space:nowrap">${ped.precioVenta?fmtM(ped.precioVenta):'—'}${precioBadge}</td>
       <td style="font-size:12px;color:var(--muted)">${ped.vendedorNombre||'—'}</td>
       <td style="font-size:12px">${guia?`<span style="font-family:monospace">${guia.numero}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
-      <td><div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">${estadoBadgeVisual(ped)}${estadoEfectivo(ped)==='en_devolucion'?`<button class="btn-icon" title="${ped.devolucionRevisada?'Revisada — clic para desmarcar':'Marcar devolución como revisada (solo visual)'}" onclick="event.stopPropagation();toggleDevolucionRevisada('${ped.id}')" style="padding:2px 6px;font-size:11px;border:1px solid ${ped.devolucionRevisada?'#16a34a':'#cbd5e1'};border-radius:6px;background:${ped.devolucionRevisada?'#16a34a':'#fff'};color:${ped.devolucionRevisada?'#fff':'#64748b'};cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:4px"><i class="bi bi-check-lg"></i> ${ped.devolucionRevisada?'Revisada':'Revisar'}</button>`:''}</div></td>
+      <td><div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">${estadoBadgeVisual(ped)}${estadoEfectivo(ped)==='en_devolucion'?`<button class="btn-icon" title="${ped.devolucionRevisada?'Revisada — clic para desmarcar':'Marcar devolución como revisada (solo visual)'}" onclick="event.stopPropagation();toggleDevolucionRevisada('${ped.id}')" style="padding:2px 6px;font-size:11px;border:1px solid ${ped.devolucionRevisada?'#dc2626':'#cbd5e1'};border-radius:6px;background:${ped.devolucionRevisada?'#dc2626':'#fff'};color:${ped.devolucionRevisada?'#fff':'#64748b'};cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:4px"><i class="bi bi-check-lg"></i> ${ped.devolucionRevisada?'Revisada':'Revisar'}</button>`:''}</div></td>
       <td><div style="display:flex;gap:4px">
         ${ped.estado==='pendiente'?`<button class="btn-icon" title="Aprobar pedido" style="color:var(--success)" onclick="aprobarPedido('${ped.id}')"><i class="bi bi-check-circle-fill"></i></button>`:''}
         <button class="btn-icon" title="Ver detalle" onclick="verDetallePedido('${ped.id}')"><i class="bi bi-eye-fill"></i></button>
@@ -7969,7 +8158,9 @@ function renderGuias(){
     if(e==='devuelto')   return guiasAll.filter(g=>g.estadoActual==='devuelta').length;
     return 0;
   };
-  const estados=['sin_guia','en_bodega','enviado','novedad','entregado','devuelto'];
+  // Los totales de exitosos (entregados) y devoluciones ahora viven en "Todos los
+  // Pedidos" (con rango de fechas). Aquí quedan solo los estados operativos de guías.
+  const estados=['sin_guia','en_bodega','enviado','novedad'];
   const labels={sin_guia:'Sin guía',en_bodega:'En oficina',enviado:'En tránsito',novedad:'Novedades',entregado:'Entregados',devuelto:'Devoluciones'};
   const colors={sin_guia:'#f59e0b',en_bodega:'#3b82f6',enviado:'#6366f1',novedad:'#ef4444',entregado:'#059669',devuelto:'#dc2626'};
   const cards=estados.map(e=>`
@@ -7978,7 +8169,7 @@ function renderGuias(){
       <div class="stat-value" style="color:${colors[e]}">${contarEstado(e)}</div>
     </div>`).join('');
   el.innerHTML=`
-    <div class="stats-row mb-16" style="grid-template-columns:repeat(6,1fr)">${cards}</div>
+    <div class="stats-row mb-16" style="grid-template-columns:repeat(4,1fr)">${cards}</div>
     <div class="card">
       <div class="flex-between mb-12" style="flex-wrap:wrap;gap:8px">
         <div class="card-title">Guías de envío ${_guiasFiltroEstado?`· <span style="color:var(--primary)">${labels[_guiasFiltroEstado]}</span> <a onclick="setGuiasFiltro('')" style="cursor:pointer;font-size:11px;color:var(--muted)">(quitar filtro)</a>`:''}</div>
@@ -8038,11 +8229,11 @@ function renderGuiasTabla(){
     const badgeGuia=esLocalOMaestra
       ?`<span class="badge badge-gray"><i class="bi bi-shop"></i> ${g.guiaMaestra?'Venta local (guía maestra)':'Entrega local'}</span>`
       :(esDevol && ped && ped.devolucionRevisada)
-      ?'<span class="badge" style="background:#16a34a;color:#fff;font-weight:700"><i class="bi bi-check-circle-fill"></i> Devolución revisada</span>'
+      ?'<span class="badge badge-devol-revisada"><i class="bi bi-check-circle-fill"></i> Devolución revisada</span>'
       :eu==='entregada'?estadoBadge('entregado'):eu==='novedad'?estadoBadge('novedad'):esDevol?estadoBadge('en_devolucion'):eu==='en_oficina'?'<span class="badge badge-info"><i class="bi bi-building"></i> En oficina</span>':eu==='en_transito'?'<span class="badge badge-enviado"><i class="bi bi-truck"></i> En tránsito</span>':'<span class="badge badge-gray"><i class="bi bi-hourglass-split"></i> Registrada</span>';
     // Chulito "Revisar" (solo admin, solo devoluciones). Visual: no cambia stock.
     const revBtnGuia=(esDevol && ped && isAdmin())
-      ?`<button class="btn-icon" title="${ped.devolucionRevisada?'Revisada — clic para desmarcar':'Marcar devolución como revisada (solo visual)'}" onclick="toggleDevolucionRevisada('${ped.id}')" style="margin-top:4px;padding:2px 6px;font-size:11px;border:1px solid ${ped.devolucionRevisada?'#16a34a':'#cbd5e1'};border-radius:6px;background:${ped.devolucionRevisada?'#16a34a':'#fff'};color:${ped.devolucionRevisada?'#fff':'#64748b'};cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:4px"><i class="bi bi-check-lg"></i> ${ped.devolucionRevisada?'Revisada':'Revisar'}</button>`
+      ?`<button class="btn-icon" title="${ped.devolucionRevisada?'Revisada — clic para desmarcar':'Marcar devolución como revisada (solo visual)'}" onclick="toggleDevolucionRevisada('${ped.id}')" style="margin-top:4px;padding:2px 6px;font-size:11px;border:1px solid ${ped.devolucionRevisada?'#dc2626':'#cbd5e1'};border-radius:6px;background:${ped.devolucionRevisada?'#dc2626':'#fff'};color:${ped.devolucionRevisada?'#fff':'#64748b'};cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:4px"><i class="bi bi-check-lg"></i> ${ped.devolucionRevisada?'Revisada':'Revisar'}</button>`
       :'';
     const textoRastreo=g.estadoTexto?`<div style="font-size:10px;color:var(--muted);margin-top:2px">${g.estadoTexto}</div>`:'';
     const ciudadDest=g.ciudadDestino?`<div style="font-size:10px;color:var(--muted)">${g.ciudadDestino}</div>`:'';
@@ -9623,6 +9814,19 @@ function dispararFlujoPublicidad(){
     .finally(()=>{ _publiRefreshEnCurso=false; });
 }
 
+// Ventas del día para la tarjeta de mensajes: pedidos no cancelados creados en la
+// fecha elegida en el panel (o hoy). Si la vista es Semana/Mes sigue mostrando HOY.
+function _ventasDelDiaPubli(){
+  const dia=_publiFecha||hoy();
+  let n=0, valor=0;
+  getPedidos().forEach(p=>{
+    if(estadoEfectivo(p)==='cancelado') return;
+    const f=p.fecha || (p.ts?new Date(p.ts).toISOString().slice(0,10):'');
+    if(f!==dia) return;
+    n++; valor+=Number(p.precioVenta)||0;
+  });
+  return {n, valor, dia};
+}
 function renderPublicidadCuerpo(){
   const empty=document.getElementById('publi-empty');
   const sync=document.getElementById('publi-last-sync');
@@ -9657,17 +9861,19 @@ function renderPublicidadCuerpo(){
   const ventaRuta=data.ventaEnRuta||0;
   const costoEnt=data.costoEntregado||0;
   const costoRuta=data.costoEnRuta||0;
-  const utilEnt=ventaEnt-costoEnt-gasto;
-  const utilRuta=ventaRuta-costoRuta; // gasto ya descontado en utilEnt
+  const utilEnt=ventaEnt-costoEnt-gasto;      // utilidad real (solo lo ya entregado)
+  const utilRuta=ventaRuta-costoRuta-gasto;   // utilidad ESPERADA: venta en ruta − costo en ruta − gasto
   const roasEnt=gasto>0?(ventaEnt/gasto):0;
   const roasRuta=gasto>0?(ventaRuta/gasto):0;
   const cpc=msg>0?(gasto/msg):0;
   document.getElementById('publi-s-gasto').textContent=fmtM(gasto);
   document.getElementById('publi-s-msg').textContent=fmtN(msg);
-  document.getElementById('publi-s-msg-sub').textContent='$/conversación: '+(cpc?fmtM(Math.round(cpc)):'—');
-  document.getElementById('publi-s-util').textContent=fmtM(utilEnt);
-  document.getElementById('publi-s-util').className='stat-value '+(utilEnt>=0?'text-success':'text-danger');
-  document.getElementById('publi-s-util-sub').textContent='En ruta: '+fmtM(utilRuta);
+  document.getElementById('publi-s-util').textContent=fmtM(utilRuta);
+  document.getElementById('publi-s-util').className='stat-value '+(utilRuta>=0?'text-success':'text-danger');
+  document.getElementById('publi-s-util-sub').textContent='Real entregado: '+fmtM(utilEnt);
+  // Ventas del día (pedidos que la app registró hoy) junto a los mensajes.
+  const ventasDia=_ventasDelDiaPubli();
+  document.getElementById('publi-s-msg-sub').textContent='Ventas del día: '+fmtN(ventasDia.n)+' ('+fmtM(ventasDia.valor)+') · $/conv: '+(cpc?fmtM(Math.round(cpc)):'—');
   document.getElementById('publi-s-roas').textContent=roasEnt?roasEnt.toFixed(2)+'x':'—';
   document.getElementById('publi-s-roas').className='stat-value '+(roasEnt>=2?'text-success':roasEnt>=1?'text-warning':'text-danger');
   document.getElementById('publi-s-roas-sub').textContent='En ruta: '+(roasRuta?roasRuta.toFixed(2)+'x':'—');
@@ -9696,13 +9902,13 @@ function renderPubliVendedores(rows){
   let html=`<table><thead><tr>
     <th>Vendedor</th><th>Estado</th><th>Antig.</th><th>Gasto</th><th>Presup.</th>
     <th>Mensajes</th><th>$/conv</th><th>CTR</th><th>CPM</th><th>CPC</th>
-    <th>Venta entreg.</th><th>Venta en ruta</th><th>Utilidad</th><th>ROAS entreg.</th>
+    <th>Venta entreg.</th><th>Venta en ruta</th><th title="Venta en ruta − costo en ruta − gasto">Utilidad esperada</th><th>ROAS entreg.</th>
   </tr></thead><tbody>`;
   rows.forEach(r=>{
     const gasto=r.gasto||0, msg=r.mensajes||0;
     const ventaEnt=r.ventaEntregada||0, ventaRuta=r.ventaEnRuta||0;
-    const costoEnt=r.costoEntregado||0;
-    const util=ventaEnt-costoEnt-gasto;
+    const costoRuta=r.costoEnRuta||0;
+    const util=ventaRuta-costoRuta-gasto; // utilidad esperada (venta en ruta)
     const roas=gasto>0?(ventaEnt/gasto):0;
     const cpconv=msg>0?(gasto/msg):0;
     // Presupuesto: si tenemos diario y gastoHoy, calculamos %
@@ -9768,19 +9974,19 @@ function renderPubliModelos(rows){
     grupos[k].costoEnRuta += r.costoEnRuta||0;
   });
   let rowsAgg=Object.values(grupos).sort((a,b)=>{
-    const ua=(a.ventaEntregada||0)-(a.costoEntregado||0)-(a.gasto||0);
-    const ub=(b.ventaEntregada||0)-(b.costoEntregado||0)-(b.gasto||0);
+    const ua=(a.ventaEnRuta||0)-(a.costoEnRuta||0)-(a.gasto||0);
+    const ub=(b.ventaEnRuta||0)-(b.costoEnRuta||0)-(b.gasto||0);
     return ub-ua;
   });
   let html=`<table><thead><tr>
     <th>Modelo</th><th>Gasto</th><th>Mensajes</th><th>Pares</th>
-    <th>Venta entreg.</th><th>Venta en ruta</th><th>Utilidad</th><th>ROAS entreg.</th>
+    <th>Venta entreg.</th><th>Venta en ruta</th><th title="Venta en ruta − costo en ruta − gasto">Utilidad esperada</th><th>ROAS entreg.</th>
   </tr></thead><tbody>`;
   rowsAgg.forEach(r=>{
     const gasto=r.gasto||0;
     const ventaEnt=r.ventaEntregada||0, ventaRuta=r.ventaEnRuta||0;
-    const costoEnt=r.costoEntregado||0;
-    const util=ventaEnt-costoEnt-gasto;
+    const costoRuta=r.costoEnRuta||0;
+    const util=ventaRuta-costoRuta-gasto; // utilidad esperada (venta en ruta)
     const roas=gasto>0?(ventaEnt/gasto):0;
     html+=`<tr>
       <td><strong>${r.modelo||'—'}</strong></td>
@@ -10125,10 +10331,11 @@ async function _calcPublicidadVendedor(userObj, rango){
     ventaEnRuta: c.ventaEnRuta,
     costoEntregado: c.costoEntregado,
     costoEnRuta: c.costoEnRuta,
-    utilidad: c.ventaEntregada - c.costoEntregado - c.gasto,
+    utilidad: c.ventaEnRuta - c.costoEnRuta - c.gasto, // utilidad esperada (venta en ruta)
+    utilidadReal: c.ventaEntregada - c.costoEntregado - c.gasto,
     roasEntregado: c.gasto>0 ? c.ventaEntregada/c.gasto : 0
   })).sort((a,b) => (b.gasto||0) - (a.gasto||0));
-  const utilidadTotal = ventaEntTotal - costoEntTotal - gastoTotal;
+  const utilidadTotal = ventaRutaTotal - costoRutaTotal - gastoTotal; // utilidad esperada (venta en ruta)
   const roasTotal = gastoTotal > 0 ? (ventaEntTotal / gastoTotal) : 0;
   return { gastoTotal, mensajesTotal, ventaEntTotal, ventaRutaTotal, costoEntTotal, costoRutaTotal, utilidadTotal, roasTotal, detalleDias, campañas, fuente };
 }
