@@ -6362,6 +6362,10 @@ function aplicarSalidaStockPedido(ped, callback, opts){
     if(USE_FIREBASE){
       REF.prods.child(pid).transaction(current=>{
         if(!current){ motivoFallo='El producto no se pudo leer del servidor. Reintenta.'; return current; }
+        // Total pedido por variante (el carrito puede traer la misma variante en varias
+        // líneas): el control de "sin stock" debe usar la SUMA, no cada línea por separado.
+        const necVar={};
+        for(const it of itemsDelProd){ const vv=findVar(current.variantes, it); if(vv) necVar[vv.id]=(necVar[vv.id]||0)+(it.cantidad||0); }
         for(const it of itemsDelProd){
           const v=findVar(current.variantes, it); // por id, o por talla+color si el id cambió
           if(!v){ motivoFallo=`La talla ${it.talla||'?'}/${it.color||'?'} de "${it.productoNombre||''}" no existe en el catálogo del servidor. Usa "Auditar stock" en Productos.`; return undefined; }
@@ -6370,7 +6374,7 @@ function aplicarSalidaStockPedido(ped, callback, opts){
           // EXCEPCIÓN: BODEGA 2 y PROMOCIÓNES nunca admiten backorder, así que se
           // abortan si no hay stock físico suficiente, aunque permitirNeg sea true.
           const itNoBackorder = !bodegaPermiteBackorder(it.bodegaAlMomento || current.bodega, current);
-          if((!permitirNeg || itNoBackorder) && (v.stockActual||0) < it.cantidad){
+          if((!permitirNeg || itNoBackorder) && (v.stockActual||0) < (necVar[v.id]||it.cantidad)){
             motivoFallo = itNoBackorder
               ? `${it.talla||'?'}/${it.color||'?'} de "${it.productoNombre||''}" (${it.bodegaAlMomento||current.bodega||'bodega sin backorder'}): no hay stock suficiente y no admite "por reponer".`
               : `Stock insuficiente de ${it.talla||'?'}/${it.color||'?'}.`;
@@ -6997,7 +7001,7 @@ function registrarPedido(){
 // Resumen de productos de un pedido (soporta formato antiguo y nuevo con items[])
 function pedResumen(ped){
   if(Array.isArray(ped.items)&&ped.items.length){
-    return ped.items.map(i=>`${i.productoNombre} T${i.talla}/${i.color} ×${i.cantidad}`).join('<br>');
+    return ped.items.map(i=>i.externa?`${i.productoNombre} T${i.talla} ×${i.cantidad}`:`${i.productoNombre} T${i.talla}/${i.color} ×${i.cantidad}`).join('<br>');
   }
   return `${ped.productoNombre||'—'} T${ped.talla||''}/${ped.color||''} ×${ped.cantidadPares||1}`;
 }
