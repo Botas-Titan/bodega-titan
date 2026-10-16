@@ -831,7 +831,8 @@ textarea{resize:vertical}
                   <input type="checkbox" id="ped-bono" style="width:auto;margin:0" onchange="onBonoChange()"> 🎁 Bono de fidelización 10%
                 </label>
                 <div class="addr-status" id="bono-status"></div>
-                <div style="font-size:11px;color:var(--muted);margin-top:3px">Solo para clientes que ya compraron (nombre y celular deben coincidir). Es una marca visual: <b>no cambia el precio</b>.</div>
+                <div id="bono-resumen"></div>
+                <div style="font-size:11px;color:var(--muted);margin-top:3px">Solo para clientes que ya compraron (nombre y celular deben coincidir). Se descuenta el 10% del precio total del pedido.</div>
               </div>
 
               <!-- Cédula del destinatario (se oculta cuando el envío es a oficina) -->
@@ -6047,6 +6048,7 @@ function renderCarrito(){
     }
     unlockPedidoStep2();
   }
+  onBonoChange(); // refresca el resumen del bono (precio normal / descuento / total) con el carrito actual
 }
 
 // ── Tipo de destino ────────────────────────
@@ -6145,17 +6147,44 @@ function verificarClienteBono(nombre,tel){
   const ult=coinc.reduce((a,b)=>((b.ts||0)>(a.ts||0)?b:a));
   return {estado:'ok', previo:ult, total:coinc.length};
 }
+// Precio base del pedido que se está armando (combo = precio del combo; si no, suma de ítems).
+function subtotalCarritoActual(){
+  return esVentaGrupo(tipoVenta) ? (Number(comboPrecio)||0) : carrito.reduce((s,i)=>s+(Number(i.precio)||0)*(Number(i.cantidad)||0),0);
+}
+// 10 % sobre el precio normal, redondeado al peso. total = lo que paga el cliente.
+function calcBono(sub){ const desc=Math.round((Number(sub)||0)*BONO_FIDELIZACION_PCT/100); return {sub:Number(sub)||0, desc, total:(Number(sub)||0)-desc}; }
+function bonoResumenHtml(sub){
+  const b=calcBono(sub); if(!b.sub) return '';
+  return `<div style="margin-top:8px;border:1px solid #fcd34d;background:#fffbeb;border-radius:8px;padding:8px 12px;font-size:13px;max-width:360px">
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Precio normal</span><span>${fmtM(b.sub)}</span></div>
+    <div style="display:flex;justify-content:space-between;color:#b45309"><span>🎁 Bono ${BONO_FIDELIZACION_PCT}%</span><span>− ${fmtM(b.desc)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-weight:800;border-top:1px dashed #fcd34d;margin-top:4px;padding-top:4px"><span>Total con bono</span><span style="color:#15803d">${fmtM(b.total)}</span></div>
+  </div>`;
+}
 function onBonoChange(){
   const chk=document.getElementById('ped-bono'), st=document.getElementById('bono-status'); if(!chk||!st) return;
+  const rs=document.getElementById('bono-resumen');
+  if(rs) rs.innerHTML='';
   if(!chk.checked){ st.innerHTML=''; return; }
   const r=verificarClienteBono(document.getElementById('ped-nombre')?.value, document.getElementById('ped-tel')?.value);
+  if(r.estado==='ok' && rs) rs.innerHTML=bonoResumenHtml(subtotalCarritoActual());
   if(r.estado==='ok') st.innerHTML=`<span class="addr-ok"><i class="bi bi-check-circle-fill"></i> Cliente anterior verificado: ${r.previo.cliente.nombre} (${r.total} pedido${r.total===1?'':'s'} previo${r.total===1?'':'s'}, último ${fmtD(r.previo.fecha)})</span>`;
   else if(r.estado==='incompleto') st.innerHTML=`<span style="color:var(--muted);font-size:11px">Completa el nombre y el celular (10 dígitos) para verificar que es cliente anterior.</span>`;
   else if(r.estado==='nombre_distinto') st.innerHTML=`<span class="addr-err"><i class="bi bi-x-circle-fill"></i> Ese celular está registrado a nombre de "${r.previo.cliente.nombre}". El nombre debe coincidir para aplicar el bono.</span>`;
   else st.innerHTML=`<span class="addr-err"><i class="bi bi-x-circle-fill"></i> No hay compras anteriores con ese celular: el bono es solo para clientes que recompran.</span>`;
 }
 function bonoBadge(ped){
-  return (ped&&ped.bonoFidelizacion)?` <span class="badge" style="background:#fef3c7;color:#92400e;font-size:9px;padding:2px 6px;margin-left:4px;font-weight:700;border:1px solid #fcd34d" title="Pedido de recompra con bono de fidelización ${ped.bonoPorcentaje||BONO_FIDELIZACION_PCT}% (marca visual, el precio no cambia)">🎁 BONO ${ped.bonoPorcentaje||BONO_FIDELIZACION_PCT}%</span>`:'';
+  return (ped&&ped.bonoFidelizacion)?` <span class="badge" style="background:#fef3c7;color:#92400e;font-size:9px;padding:2px 6px;margin-left:4px;font-weight:700;border:1px solid #fcd34d" title="Pedido de recompra con bono de fidelización ${ped.bonoPorcentaje||BONO_FIDELIZACION_PCT}% ya descontado del precio">🎁 BONO ${ped.bonoPorcentaje||BONO_FIDELIZACION_PCT}%</span>`:'';
+}
+// Precio del pedido para mostrar. Con bono: precio normal tachado, descuento y total final.
+// (Pedidos con bono anteriores al descuento real no tienen bonoDescuento: se muestra solo el precio.)
+function precioPedidoHtml(ped, compacto){
+  if(!ped||!ped.precioVenta) return '—';
+  if(ped.bonoFidelizacion && ped.bonoDescuento>0 && ped.precioSinBono){
+    if(compacto) return `<span style="text-decoration:line-through;color:var(--muted);font-size:11px">${fmtM(ped.precioSinBono)}</span><br><span style="color:#b45309;font-size:10px">🎁 −${fmtM(ped.bonoDescuento)}</span><br><strong>${fmtM(ped.precioVenta)}</strong>`;
+    return `<span style="text-decoration:line-through;color:var(--muted)">${fmtM(ped.precioSinBono)}</span> <span style="color:#b45309">🎁 −${fmtM(ped.bonoDescuento)}</span> → <strong>${fmtM(ped.precioVenta)}</strong>`;
+  }
+  return fmtM(ped.precioVenta);
 }
 function validarTelefono(inp){
   // Sanitiza en vivo: solo dígitos y máximo 10.
@@ -6751,8 +6780,15 @@ function registrarPedido(){
     cambioGuiaCliente: tipoVenta==='cambio' && _cambioGuiaInfo ? _cambioGuiaInfo : null,
     // Marca de pedido con bota(s) externa(s) (fuera del inventario)
     botaExterna: hayExterna,
-    // Bono de fidelización: SOLO visual (no altera precioVenta ni los precios de los ítems)
-    ...(bonoMarcado ? { bonoFidelizacion:true, bonoPorcentaje:BONO_FIDELIZACION_PCT, bonoPedidoPrevio:bonoPrevioId } : {})
+    // Bono de fidelización: el 10 % se descuenta del TOTAL del pedido (precioVenta queda
+    // con el precio final). Se guardan el precio normal y el descuento para mostrarlos.
+    // Los precios por ítem no se tocan (son los que escribió la vendedora).
+    ...(bonoMarcado ? (()=>{
+      const sub = esVentaGrupo(tipoVenta) ? comboPrecio : items.reduce((s,i)=>s+i.precioVenta*i.cantidad,0);
+      const b = calcBono(sub);
+      return { bonoFidelizacion:true, bonoPorcentaje:BONO_FIDELIZACION_PCT, bonoPedidoPrevio:bonoPrevioId,
+               precioSinBono:b.sub, bonoDescuento:b.desc, precioVenta:b.total };
+    })() : {})
   };
 
   // NOTA: ya NO se bloquea el pedido por stock insuficiente. La transacción
@@ -7096,7 +7132,7 @@ function renderMisPedidos(){
         <div><span style="color:var(--muted)">Tel:</span> ${ped.cliente.telefono}</div>
         ${ped.cantidadPares&&ped.cantidadPares>1?`<div><span style="color:var(--muted)">Pares:</span> ${ped.cantidadPares}</div>`:''}
         ${ped.formaPago?`<div><span style="color:var(--muted)">Pago:</span> ${ped.formaPago.charAt(0).toUpperCase()+ped.formaPago.slice(1)}</div>`:''}
-        ${ped.precioVenta?`<div><span style="color:var(--muted)">Precio:</span> ${fmtM(ped.precioVenta)}</div>`:''}
+        ${ped.precioVenta?`<div><span style="color:var(--muted)">Precio:</span> ${precioPedidoHtml(ped)}</div>`:''}
         <div style="grid-column:1/-1"><span style="color:var(--muted)">${ped.cliente.destinoTipo==='oficina'?'<i class="bi bi-building"></i> Empresa:':'<i class="bi bi-geo-alt-fill"></i> Dirección:'}</span> ${ped.cliente.empresa?ped.cliente.empresa+' — ':''}${ped.cliente.direccion}${ped.cliente.barrio?', Barrio '+ped.cliente.barrio:''}, ${ped.cliente.ciudad}${ped.cliente.localidad?' (Loc. '+ped.cliente.localidad+')':''}${ped.cliente.departamento?' — '+ped.cliente.departamento:''}</div>
         ${ped.cliente.referencia?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Referencia:</span> ${ped.cliente.referencia}</div>`:''}
         ${ped.cliente.notas?`<div style="grid-column:1/-1"><span style="color:var(--muted)">Notas:</span> ${ped.cliente.notas}</div>`:''}
@@ -7499,7 +7535,7 @@ function renderAdminPedidos(){
           <div style="font-size:10px;color:var(--muted)">${ped.cliente.barrio||''}${ped.cliente.ciudad?', '+ped.cliente.ciudad:''}</div></td>
       <td style="font-size:12px">${ped.cliente.ciudad||'—'}</td>
       <td style="font-size:11px;color:var(--muted)">${ped.formaPago?ped.formaPago.charAt(0).toUpperCase()+ped.formaPago.slice(1):'—'}</td>
-      <td style="font-size:12px;white-space:nowrap">${ped.precioVenta?fmtM(ped.precioVenta):'—'}${precioBadge}</td>
+      <td style="font-size:12px;white-space:nowrap">${precioPedidoHtml(ped,true)}${precioBadge}</td>
       <td style="font-size:12px;color:var(--muted)">${ped.vendedorNombre||'—'}</td>
       <td style="font-size:12px">${guia?`<span style="font-family:monospace">${guia.numero}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
       <td><div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">${estadoBadgeVisual(ped)}${estadoEfectivo(ped)==='en_devolucion'?`<button class="btn-icon" title="${ped.devolucionRevisada?'Revisada — clic para desmarcar':'Marcar devolución como revisada (solo visual)'}" onclick="event.stopPropagation();toggleDevolucionRevisada('${ped.id}')" style="padding:2px 6px;font-size:11px;border:1px solid ${ped.devolucionRevisada?'#dc2626':'#cbd5e1'};border-radius:6px;background:${ped.devolucionRevisada?'#dc2626':'#fff'};color:${ped.devolucionRevisada?'#fff':'#64748b'};cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:4px"><i class="bi bi-check-lg"></i> ${ped.devolucionRevisada?'Revisada':'Revisar'}</button>`:''}</div></td>
@@ -7564,7 +7600,7 @@ function verDetallePedido(id){
       <div style="font-size:12px;color:var(--muted)">${ped.cliente.ciudad}${ped.cliente.localidad?' — Loc. '+ped.cliente.localidad:''}${ped.cliente.departamento?', '+ped.cliente.departamento:''}</div>
       ${ped.cliente.cedula?`<div style="font-size:12px;color:var(--muted)"><i class="bi bi-person-vcard-fill"></i> CC: ${ped.cliente.cedula}</div>`:''}
       ${ped.formaPago?`<div style="font-size:12px;color:var(--muted)"><i class="bi bi-credit-card-fill"></i> Pago: ${ped.formaPago.charAt(0).toUpperCase()+ped.formaPago.slice(1)}</div>`:''}
-      ${ped.precioVenta?`<div style="font-size:12px;margin-top:4px;font-weight:600;${ped.precioBajo?'color:#d97706':'color:var(--text)'}"><i class="bi bi-tag-fill"></i> Precio: ${fmtM(ped.precioVenta)}${ped.precioBajo?` <span class="badge badge-warning" style="font-size:10px"><i class="bi bi-exclamation-triangle-fill"></i> bajo registro</span>`:ped.precioAlto?` <span style="font-size:10px;color:#3b82f6"><i class="bi bi-arrow-up-circle-fill"></i> sobre registro</span>`:''}</div>`:''}
+      ${ped.precioVenta?`<div style="font-size:12px;margin-top:4px;font-weight:600;${ped.precioBajo?'color:#d97706':'color:var(--text)'}"><i class="bi bi-tag-fill"></i> Precio: ${precioPedidoHtml(ped)}${ped.precioBajo?` <span class="badge badge-warning" style="font-size:10px"><i class="bi bi-exclamation-triangle-fill"></i> bajo registro</span>`:ped.precioAlto?` <span style="font-size:10px;color:#3b82f6"><i class="bi bi-arrow-up-circle-fill"></i> sobre registro</span>`:''}</div>`:''}
       ${ped.cliente.notas?`<div style="font-size:12px;color:var(--muted);margin-top:4px"><i class="bi bi-chat-left-text-fill"></i> ${ped.cliente.notas}</div>`:''}
     </div>
   </div>`;
@@ -7812,6 +7848,12 @@ function guardarEdicionPedido(){
     color: items[0]?.color || ped.color,
     cantidadPares: items.reduce((s,i)=>s+(parseInt(i.cantidad)||0),0),
     precioVenta: precioTotal || items.reduce((s,i)=>s+(i.precioVenta*i.cantidad),0),
+    // Pedido con bono: si el admin cambia el precio final, se recalcula el desglose
+    // (precio normal = final / 0.9, descuento = diferencia) para que siga cuadrando.
+    ...((ped.bonoFidelizacion && precioTotal && precioTotal!==ped.precioVenta) ? (()=>{
+      const pct=ped.bonoPorcentaje||BONO_FIDELIZACION_PCT, norm=Math.round(precioTotal/(1-pct/100));
+      return { precioSinBono:norm, bonoDescuento:norm-precioTotal };
+    })() : {}),
     formaPago: document.getElementById('ep-forma-pago').value,
     vendedorNombre: val('ep-vendedor') || ped.vendedorNombre,
     tsEdicion: Date.now()
