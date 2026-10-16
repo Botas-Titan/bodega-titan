@@ -5775,7 +5775,11 @@ async function verificarGuiaCambio(){
 }
 
 function setTipoVenta(t,btn){
-  tipoVenta=t; comboPrecio=0; carrito=[];
+  // Pasar entre "Individual" y "Bota Externa" CONSERVA el carrito: así una misma orden
+  // puede llevar una bota de bodega y una externa. Con los demás modos (dúo, trío,
+  // cuarteto, cambio) el carrito se reinicia porque tienen reglas propias de precio.
+  const _mantener = carrito.length>0 && (t==='externa'||t==='individual') && (tipoVenta==='externa'||tipoVenta==='individual');
+  tipoVenta=t; comboPrecio=0; if(!_mantener) carrito=[];
   document.querySelectorAll('.tventa-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   const cp=document.getElementById('combo-precio'); if(cp) cp.value='';
@@ -5800,13 +5804,16 @@ function setTipoVenta(t,btn){
     resetExternaForm();
   }
   if(t==='externa'){
-    if(hint){hint.style.display='block';hint.textContent='Bota externa: no está en tu inventario, no descuenta stock. Escribe el modelo y sube una foto (obligatoria).';}
+    if(hint){hint.style.display='block';hint.textContent='Bota externa: no está en tu inventario, no descuenta stock. Escribe el modelo y sube una foto (obligatoria). Para combinarla con una bota de bodega en la misma orden, cambia a "Individual": el carrito se conserva.';}
     if(precioG) precioG.style.display='none';
     renderCarrito();
     return;
   }
   if(t==='individual'){
-    if(hint){hint.style.display='none';}
+    if(hint){
+      if(carrito.some(i=>i.externa)){hint.style.display='block';hint.textContent='Tu carrito tiene una bota externa. Agrega aquí la bota de bodega; si falta otra externa, vuelve a "Bota Externa".';}
+      else hint.style.display='none';
+    }
     if(precioG) precioG.style.display='block';
   } else if(t==='cambio'){
     // Cambio: comportamiento idéntico a individual (descuenta stock, exige
@@ -6282,7 +6289,10 @@ function aplicarSalidaStockPedido(ped, callback, opts){
   const items=Array.isArray(ped.items)&&ped.items.length?ped.items
     :[{pid:ped.pid||ped.productoId,vid:ped.vid||ped.varianteId,cantidad:ped.cantidadPares||1,productoNombre:ped.productoNombre,talla:ped.talla,color:ped.color}];
   const itemsPorPid={};
-  items.forEach(it=>{ (itemsPorPid[it.pid]=itemsPorPid[it.pid]||[]).push(it); });
+  // Las botas EXTERNAS no están en el inventario (pid null): no se descuentan ni
+  // generan movimientos. Sin este filtro, un pedido mixto (bodega + externa) intentaba
+  // una transacción sobre un producto inexistente y dejaba una salida fantasma.
+  items.forEach(it=>{ if(it.externa || !it.pid) return; (itemsPorPid[it.pid]=itemsPorPid[it.pid]||[]).push(it); });
   const pids=Object.keys(itemsPorPid);
   if(!pids.length){ callback(true,{backorderPorVid}); return; }
 
