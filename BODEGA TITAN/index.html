@@ -1304,10 +1304,6 @@ textarea{resize:vertical}
       <input type="text" id="u-nombre-publi" placeholder="Ej: DEICY 24-03  (déjalo vacío si quieres match automático por primera palabra)">
       <div style="font-size:11px;color:var(--muted);margin-top:4px"><i class="bi bi-info-circle"></i> Debe coincidir EXACTAMENTE con el campo "nombre" de la campaña en Meta. Si tienes vendedores con primer nombre repetido, llena esto para evitar que se mezclen datos en el reporte.</div>
     </div>
-    <div class="form-group" id="u-tiktok-grp">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;margin:0"><input type="checkbox" id="u-tiktok" style="width:auto;margin:0"> 🎵 Usuario de TikTok Live</label>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px"><i class="bi bi-info-circle"></i> Solo para vendedores. Agrega en "Nuevo Pedido" el obsequio (medias o plantillas) y la casilla de envío. Todo lo demás funciona igual que cualquier colaboradora.</div>
-    </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="cerrarModal('modal-usuario')">Cancelar</button>
       <button class="btn btn-primary" onclick="guardarUsuario()">Guardar Usuario</button>
@@ -5195,7 +5191,7 @@ function renderUsuarios(){
           ? `<td><button class="btn btn-sm" style="background:#10b981;color:#fff;font-weight:600;padding:6px 10px;font-size:12px;border:none;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px" onclick="exportarExcelColaborador('${u.id}')" title="Descargar hoja de cálculo del vendedor (corte 28 a 27)"><i class="bi bi-file-earmark-excel-fill"></i> Excel</button></td>`
           : `<td style="color:var(--muted);font-size:12px">—</td>`)
       : '';
-    html+=`<tr><td><strong>${u.nombre}</strong>${isMe?' <span class="badge badge-info">Tú</span>':''}</td><td style="font-family:monospace;font-size:12px">${u.username}</td><td>${u.rol==='admin'?'<span class="badge badge-purple">Administrador</span>':u.rol==='vendedor'?'<span class="badge badge-info">Vendedor</span>'+(u.canalTikTok?' <span class="badge" style="background:#111;color:#fff">🎵 TikTok</span>':''):'<span class="badge badge-gray">Operador</span>'}</td><td>${u.activo?'<span class="badge badge-success">Activo</span>':'<span class="badge badge-danger">Inactivo</span>'}</td>${reporteCell}<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="abrirModalUsuario('${u.id}')" title="Editar"><i class="bi bi-pencil-fill"></i></button>${!isMe?`<button class="btn-icon" onclick="toggleUser('${u.id}')" title="${u.activo?'Desactivar':'Activar'}"><i class="bi bi-${u.activo?'lock-fill':'unlock-fill'}"></i></button>`:''}${!isMe?`<button class="btn-icon" style="color:var(--danger)" onclick="pedirEliminarUser('${u.id}')" title="Eliminar"><i class="bi bi-trash-fill"></i></button>`:''}</div></td></tr>`;
+    html+=`<tr><td><strong>${u.nombre}</strong>${isMe?' <span class="badge badge-info">Tú</span>':''}</td><td style="font-family:monospace;font-size:12px">${u.username}</td><td>${u.rol==='admin'?'<span class="badge badge-purple">Administrador</span>':u.rol==='vendedor'?'<span class="badge badge-info">Vendedor</span>'+(String(u.username||'').toLowerCase()===USUARIO_TIKTOK?' <span class="badge" style="background:#111;color:#fff">🎵 TikTok</span>':''):'<span class="badge badge-gray">Operador</span>'}</td><td>${u.activo?'<span class="badge badge-success">Activo</span>':'<span class="badge badge-danger">Inactivo</span>'}</td>${reporteCell}<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="abrirModalUsuario('${u.id}')" title="Editar"><i class="bi bi-pencil-fill"></i></button>${!isMe?`<button class="btn-icon" onclick="toggleUser('${u.id}')" title="${u.activo?'Desactivar':'Activar'}"><i class="bi bi-${u.activo?'lock-fill':'unlock-fill'}"></i></button>`:''}${!isMe?`<button class="btn-icon" style="color:var(--danger)" onclick="pedirEliminarUser('${u.id}')" title="Eliminar"><i class="bi bi-trash-fill"></i></button>`:''}</div></td></tr>`;
   });
   wrap.innerHTML=html+'</tbody></table>';
 }
@@ -5211,20 +5207,15 @@ function abrirModalUsuario(id){
     document.getElementById('u-pin').value='';
     document.getElementById('u-rol').value=u.rol;
     document.getElementById('u-nombre-publi').value=u.nombrePubli||'';
-    document.getElementById('u-tiktok').checked=!!u.canalTikTok;
   } else {
     document.getElementById('mu-title').textContent='Nuevo Usuario';
     ['u-nombre','u-user','u-pin','u-nombre-publi'].forEach(x=>document.getElementById(x).value='');
     document.getElementById('u-rol').value='vendedor';
-    document.getElementById('u-tiktok').checked=false;
   }
   // Mostrar el campo solo para vendedores
   const toggleCampo=()=>{
-    const esV=document.getElementById('u-rol').value==='vendedor';
     const grp=document.getElementById('u-publi-grp');
-    if(grp) grp.style.display = esV ? 'block' : 'none';
-    const gt=document.getElementById('u-tiktok-grp');
-    if(gt) gt.style.display = esV ? 'block' : 'none';
+    if(grp) grp.style.display = document.getElementById('u-rol').value==='vendedor' ? 'block' : 'none';
   };
   toggleCampo();
   document.getElementById('u-rol').onchange = toggleCampo;
@@ -5237,7 +5228,6 @@ function guardarUsuario(){
   const pin=document.getElementById('u-pin').value;
   const rol=document.getElementById('u-rol').value;
   const nombrePubli=document.getElementById('u-nombre-publi').value.trim();
-  const canalTikTok = rol==='vendedor' && !!document.getElementById('u-tiktok')?.checked;
   if(!nombre||!username){toast('Nombre y usuario son requeridos');return;}
   const users=getUsers();
 
@@ -5255,7 +5245,7 @@ function guardarUsuario(){
         toast('❌ No puedes cambiar el rol del único Administrador. Debe haber al menos uno.');
         return;
       }
-      const updated={...u, nombre, username, rol, nombrePubli, canalTikTok};
+      const updated={...u, nombre, username, rol, nombrePubli};
       if(pin) updated.pin=pin;
       writeUser(updated);
     }
@@ -5263,7 +5253,7 @@ function guardarUsuario(){
   } else {
     if(!pin||pin.length<4){toast('PIN mínimo 4 caracteres');return;}
     if(users.find(u=>u.username===username)){toast('Usuario ya existe');return;}
-    writeUser({id:uid(), nombre, username, pin, rol, nombrePubli, canalTikTok, activo:true});
+    writeUser({id:uid(), nombre, username, pin, rol, nombrePubli, activo:true});
     toast('Usuario creado');
   }
   cerrarModal('modal-usuario');
@@ -6212,7 +6202,9 @@ function onBonoChange(){
 //   marcada  = "con envío": el envío lo asumimos nosotros.
 //   sin marcar = "sin envío": el cliente paga el envío.
 let _obsequioSel='';
-function esUsuarioTikTok(){ return !!(CU && CU.rol==='vendedor' && CU.canalTikTok===true); }
+// Exclusivo del usuario "tiktok" (login). Ningún otro usuario, ni el admin, ve este bloque.
+const USUARIO_TIKTOK='tiktok';
+function esUsuarioTikTok(){ return !!(CU && CU.rol==='vendedor' && String(CU.username||'').trim().toLowerCase()===USUARIO_TIKTOK); }
 function setObsequio(tipo){
   _obsequioSel=(tipo==='medias'||tipo==='plantillas')?tipo:'';
   document.querySelectorAll('.obsequio-btn').forEach(b=>{
