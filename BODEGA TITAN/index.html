@@ -7154,10 +7154,10 @@ function _mesPedido(p){
 function resumenMisVentas(misPedidos, filtroMes){
   const lista = filtroMes ? misPedidos.filter(p=>_mesPedido(p)===filtroMes) : misPedidos;
   if(!lista.length) return '';
-  let entregados=0, devueltos=0, cancelados=0, enCurso=0, montoEntregado=0;
+  let entregados=0, devueltos=0, cancelados=0, enCurso=0;
   lista.forEach(p=>{
     const e = estadoEfectivo(p);
-    if(e==='entregado'){ entregados++; montoEntregado += Number(p.precioVenta||p.precioRegistrado||0); }
+    if(e==='entregado') entregados++;
     else if(e==='en_devolucion') devueltos++;
     else if(e==='cancelado') cancelados++;
     else enCurso++;
@@ -7183,9 +7183,8 @@ function resumenMisVentas(misPedidos, filtroMes){
       ${tile(enCurso, 'En curso')}
       ${tile(exito===null?'—':exito+'%', '% de éxito', colorExito)}
     </div>
-    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
-      <span>Vendido (entregado): <strong style="color:var(--text)">${fmtM(montoEntregado)}</strong></span>
-      <span>${cancelados} cancelado${cancelados===1?'':'s'}, fuera del cálculo</span>
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">
+      ${cancelados} cancelado${cancelados===1?'':'s'}, fuera del cálculo
     </div>
   </div>`;
 }
