@@ -9913,11 +9913,28 @@ function capturarSnapshotEnHistorico(snapData){
 // Dispara el flujo de n8n (Flujo A) que vuelve a leer Meta + Firebase y reescribe
 // el snapshot/histórico. El botón refrescar de la sección lo invoca.
 let _publiRefreshEnCurso=false;
+// Límite: cada ejecución del flujo descarga ~11 MB de Firebase y consume consultas del
+// tope de la app de Meta. Se permite una ejecución cada 2 minutos por navegador.
+const PUBLI_REFRESH_MIN_MS=2*60*1000;
+const PUBLI_REFRESH_KEY='titan_publi_refresh_ts';
+function _publiRefreshEspera(){
+  let ult=0;
+  try{ ult=Number(localStorage.getItem(PUBLI_REFRESH_KEY)||0); }catch(e){}
+  ult=Math.max(ult,Number(window._publiRefreshTs||0));
+  return Math.max(0, PUBLI_REFRESH_MIN_MS-(Date.now()-ult));
+}
 function dispararFlujoPublicidad(){
   // Siempre re-render local primero (datos vigentes de Firebase).
   renderPublicidadCuerpo();
   if(!N8N_WEBHOOK_PUBLICIDAD){ toast('Configura N8N_WEBHOOK_PUBLICIDAD para disparar el flujo'); return; }
   if(_publiRefreshEnCurso) return;
+  const espera=_publiRefreshEspera();
+  if(espera>0){
+    toast('Los datos se actualizaron hace poco. Puedes volver a actualizar en '+Math.ceil(espera/1000)+' s.');
+    return;
+  }
+  window._publiRefreshTs=Date.now();
+  try{ localStorage.setItem(PUBLI_REFRESH_KEY,String(window._publiRefreshTs)); }catch(e){}
   _publiRefreshEnCurso=true;
   const sync=document.getElementById('publi-last-sync');
   if(sync) sync.textContent='Ejecutando flujo de n8n… (Meta + Firebase)';
