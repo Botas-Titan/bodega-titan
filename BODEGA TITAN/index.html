@@ -27,6 +27,7 @@
 <!-- Firebase compat (no requiere npm ni build) -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -338,12 +339,13 @@ textarea{resize:vertical}
       <p>Sistema de Gestión de Inventario</p>
     </div>
     <div class="form-group">
-      <label>Usuario</label>
-      <input type="text" id="login-user" placeholder="Nombre de usuario" autocomplete="username">
+      <label>Correo</label>
+      <input type="email" id="login-user" placeholder="nombre@bodegatitan.com" autocomplete="username"
+             onkeydown="if(event.key==='Enter')doLogin()">
     </div>
     <div class="form-group">
-      <label>PIN</label>
-      <input type="password" id="login-pin" placeholder="••••••" maxlength="8"
+      <label>Contraseña</label>
+      <input type="password" id="login-pin" placeholder="••••••" autocomplete="current-password"
              onkeydown="if(event.key==='Enter')doLogin()">
     </div>
     <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:14px;cursor:pointer;font-weight:400">
@@ -1773,11 +1775,13 @@ const firebaseConfig = {
 };
 
 let db = null;
+let auth = null;
 let firebaseInitOk = false;
 try {
   if (typeof firebase === 'undefined') throw new Error('Firebase no cargó (sin internet o CDN bloqueado)');
   firebase.initializeApp(firebaseConfig);
   db = firebase.database();
+  auth = firebase.auth();
   firebaseInitOk = true;
 } catch (e) {
   console.error('No se pudo iniciar Firebase:', e);
@@ -2104,7 +2108,12 @@ function initListeners() {
     if (fbReady && currentPage==='usuarios') renderUsuarios();
   }, onListenerError);
 
-  REF.pedidos.on('value', snap => {
+  // Pedidos: el admin pide todo; la vendedora pide SOLO los suyos. No es un
+  // filtro de pantalla — es la consulta que las reglas de Firebase autorizan.
+  const consultaPedidos = (CU && CU.rol !== 'admin')
+    ? REF.pedidos.orderByChild('vendedorId').equalTo(CU.id)
+    : REF.pedidos;
+  consultaPedidos.on('value', snap => {
     const val = snap.val();
     localPedidos = val ? Object.values(val).sort((a,b)=>(b.ts||0)-(a.ts||0)) : [];
     pedidosOk = true;
@@ -2130,7 +2139,7 @@ function initListeners() {
 
   // Compras a proveedores: dato secundario (no participa en checkReady) para
   // no retrasar el arranque de la app si esta rama del árbol tarda en llegar.
-  REF.compras.on('value', snap => {
+  if (CU && CU.rol === 'admin') REF.compras.on('value', snap => {
     const val = snap.val();
     localCompras = val ? Object.values(val).sort((a,b)=>(b.ts||0)-(a.ts||0)) : [];
     if (fbReady) { showSync(); refreshPage(); updateBadges(); }
@@ -2143,7 +2152,7 @@ function initListeners() {
     actualizarBotonBackorder();
   }, onListenerError);
 
-  REF.alertas.on('value', snap => {
+  if (CU && CU.rol === 'admin') REF.alertas.on('value', snap => {
     const val = snap.val();
     localAlertas = val ? Object.values(val).sort((a,b)=>(b.ts||0)-(a.ts||0)) : [];
     if (fbReady && currentPage==='alertas') renderAlertas();
@@ -2198,35 +2207,14 @@ function onDataReady() {
     toast(`✅ Limpieza: ${adminAEliminar.length} admin(s) duplicado(s) eliminado(s)`);
   }
 
-  // Init default admin if no users — pero solo si no existe uno ya
-  if (!localUsers.length && !window._adminInitialized) {
-    window._adminInitialized = true;
-    const id = uid();
-    const adminDefecto = {id, nombre: 'Administrador', username: 'admin', pin: '1234', rol: 'admin', activo: true};
-    console.log('[ADMIN CREADO]', adminDefecto);
-    if (USE_FIREBASE) {
-      REF.users.child(id).set(adminDefecto);
-    } else {
-      localUsers.push(adminDefecto);
-      lsSet('users', localUsers);
-    }
-  }
+  // (Eliminado) Antes, si la lista de usuarios llegaba vacia, la app creaba
+  // sola un admin con clave 1234. Con las cuentas en Firebase Authentication
+  // los usuarios se crean en la consola; la app nunca se da acceso a si misma.
   // Seed demo data if empty
   if (!localProds.length) seedDemo();
-  // Restore session — localStorage tiene prioridad (sesión recordada), si no busca sessionStorage
-  try {
-    const s = localStorage.getItem('tb_session') || sessionStorage.getItem('tb_session');
-    if (s) {
-      CU = JSON.parse(s);
-      // Verificar que el usuario aún existe y está activo
-      const stillValid = localUsers.find(x => x.id===CU.id && x.activo);
-      if (stillValid) { showApp(); return; }
-      // Si el usuario fue eliminado o desactivado, limpiar la sesión
-      localStorage.removeItem('tb_session');
-      sessionStorage.removeItem('tb_session');
-    }
-  } catch(e) {}
-  document.getElementById('login-screen').style.display = 'flex';
+  // A esta altura el ingreso ya lo valido Firebase (ver vigilarSesion), asi que
+  // no hay sesion que restaurar ni PIN que comparar: se entra directo.
+  showApp();
 }
 
 // ── Retry ──
@@ -2529,33 +2517,54 @@ function writeGuia(guia) {
 // ════════════════════════════════════════
 let CU = null;
 
+// El ingreso lo valida Firebase Authentication, no la pantalla. La app ya no
+// compara claves: le pregunta al servidor y el servidor responde quien es.
+// La sesion la guarda y la renueva el propio Firebase.
 function doLogin() {
-  const u = document.getElementById('login-user').value.trim().toLowerCase();
-  const p = document.getElementById('login-pin').value;
-  const remember = document.getElementById('login-remember')?.checked;
-  const user = localUsers.find(x => x.username.toLowerCase()===u && x.pin===p && x.activo);
-  if (!user) {
-    document.getElementById('login-error').textContent='Usuario o PIN incorrecto';
-    document.getElementById('login-pin').value='';
-    return;
-  }
-  CU = {id:user.id,nombre:user.nombre,username:user.username,rol:user.rol};
-  const serialized = JSON.stringify(CU);
-  if (remember) {
-    localStorage.setItem('tb_session', serialized);
-    sessionStorage.removeItem('tb_session');
-  } else {
-    sessionStorage.setItem('tb_session', serialized);
-    localStorage.removeItem('tb_session');
-  }
-  showApp();
+  const err = document.getElementById('login-error');
+  let correo = document.getElementById('login-user').value.trim().toLowerCase();
+  const clave = document.getElementById('login-pin').value;
+  if (!correo || !clave) { err.textContent='Escribe tu correo y tu contraseña'; return; }
+  // Comodidad: si escriben solo el nombre, se completa el dominio.
+  if (!correo.includes('@')) correo += '@bodegatitan.com';
+  const recordar = document.getElementById('login-remember')?.checked;
+  err.textContent = 'Entrando...';
+  const persistencia = recordar
+    ? firebase.auth.Auth.Persistence.LOCAL
+    : firebase.auth.Auth.Persistence.SESSION;
+  auth.setPersistence(persistencia)
+    .then(() => auth.signInWithEmailAndPassword(correo, clave))
+    .catch(e => {
+      document.getElementById('login-pin').value='';
+      const msgs = {
+        'auth/invalid-credential' : 'Correo o contraseña incorrectos',
+        'auth/wrong-password'     : 'Correo o contraseña incorrectos',
+        'auth/user-not-found'     : 'Correo o contraseña incorrectos',
+        'auth/invalid-email'      : 'Ese correo no tiene un formato válido',
+        'auth/user-disabled'      : 'Esta cuenta está desactivada',
+        'auth/too-many-requests'  : 'Demasiados intentos. Espera un momento.',
+        'auth/network-request-failed': 'Sin conexión a internet'
+      };
+      err.textContent = msgs[e.code] || 'No se pudo entrar. Intenta de nuevo.';
+    });
+}
+
+// Puente entre la cuenta de Firebase y el registro del equipo en la base.
+// titanbotas/acceso/<uid> dice a que persona y a que rol corresponde la cuenta.
+// Ese nodo solo lo escribe el admin: nadie puede ascenderse solo.
+function cargarAcceso(user) {
+  return db.ref('titanbotas/acceso').child(user.uid).once('value').then(snap => {
+    const a = snap.val();
+    if (!a || !a.usuarioId || !a.rol) throw new Error('sin-acceso');
+    return { id:a.usuarioId, nombre:a.nombre||user.email, username:(user.email||'').split('@')[0], rol:a.rol };
+  });
 }
 
 function doLogout() {
   CU=null;
   sessionStorage.removeItem('tb_session');
   localStorage.removeItem('tb_session');
-  location.reload();
+  if (auth) { auth.signOut().finally(()=>location.reload()); } else { location.reload(); }
 }
 function isAdmin()   { return CU?.rol==='admin'; }
 function isVendedor(){ return CU?.rol==='vendedor'; }
@@ -10897,7 +10906,37 @@ async function exportarExcelTodosColaboradores(){
 //  ARRANQUE DE LA APP
 // ════════════════════════════════════════
 function bootApp() {
-  initListeners();
+  vigilarSesion();
+}
+
+// Antes la app cargaba toda la base y despues mostraba el login. Ahora es al
+// reves: sin sesion no se pide un solo dato, porque las reglas de Firebase ya
+// no entregan nada a quien no se identifique.
+function vigilarSesion() {
+  if (!firebaseInitOk) { initListeners(); return; }
+  const login = document.getElementById('login-screen');
+  const carga = document.getElementById('loading-overlay');
+  auth.onAuthStateChanged(user => {
+    if (!user) {
+      CU = null;
+      if (carga) carga.style.display = 'none';
+      if (login) login.style.display = 'flex';
+      const err0 = document.getElementById('login-error');
+      if (err0 && err0.textContent === 'Entrando...') err0.textContent = '';
+      return;
+    }
+    if (login) login.style.display = 'none';
+    if (carga) carga.style.display = '';
+    cargarAcceso(user).then(datos => {
+      CU = datos;
+      initListeners();
+    }).catch(e => {
+      console.error('acceso', e);
+      auth.signOut();
+      const err = document.getElementById('login-error');
+      if (err) err.textContent = 'Tu cuenta aún no está habilitada en la app. Avísale al administrador.';
+    });
+  });
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bootApp);
