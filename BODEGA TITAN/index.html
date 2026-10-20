@@ -7146,6 +7146,50 @@ function _mesPedido(p){
   const f=p.fecha||(p.ts?new Date(p.ts).toISOString().slice(0,10):'');
   return f?f.slice(0,7):'';
 }
+// Resumen de desempeño del vendedor, encima de su lista de pedidos.
+// El % de éxito se calcula SOLO sobre lo que salió a la calle: entregados
+// frente a entregados + devueltos. Los cancelados quedan fuera a propósito,
+// porque son pedidos que nunca se despacharon y castigarían un indicador que
+// mide cómo le va al par una vez sale de la bodega.
+function resumenMisVentas(misPedidos, filtroMes){
+  const lista = filtroMes ? misPedidos.filter(p=>_mesPedido(p)===filtroMes) : misPedidos;
+  if(!lista.length) return '';
+  let entregados=0, devueltos=0, cancelados=0, enCurso=0, montoEntregado=0;
+  lista.forEach(p=>{
+    const e = estadoEfectivo(p);
+    if(e==='entregado'){ entregados++; montoEntregado += Number(p.precioVenta||p.precioRegistrado||0); }
+    else if(e==='en_devolucion') devueltos++;
+    else if(e==='cancelado') cancelados++;
+    else enCurso++;
+  });
+  const salieron = entregados + devueltos;
+  const exito = salieron ? Math.round(entregados*100/salieron) : null;
+  const colorExito = exito===null ? 'var(--muted)' : exito>=85 ? '#16a34a' : exito>=70 ? '#ca8a04' : '#dc2626';
+  const periodo = filtroMes ? 'en el mes seleccionado' : 'desde que empezaste';
+  const tile = (valor, etiqueta, color) => `<div style="flex:1;min-width:92px;text-align:center">
+      <div style="font-size:24px;font-weight:800;line-height:1.15;color:${color||'var(--text)'}">${valor}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">${etiqueta}</div>
+    </div>`;
+  return `<div class="card mb-16">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <i class="bi bi-graph-up-arrow" style="color:var(--primary)"></i>
+      <strong style="font-size:14px">Mi desempeño</strong>
+      <span style="font-size:11px;color:var(--muted)">· ${periodo}</span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${tile(lista.length, 'Pedidos')}
+      ${tile(entregados, 'Entregados', '#16a34a')}
+      ${tile(devueltos, 'Devoluciones', '#dc2626')}
+      ${tile(enCurso, 'En curso')}
+      ${tile(exito===null?'—':exito+'%', '% de éxito', colorExito)}
+    </div>
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <span>Vendido (entregado): <strong style="color:var(--text)">${fmtM(montoEntregado)}</strong></span>
+      <span>${cancelados} cancelado${cancelados===1?'':'s'}, fuera del cálculo</span>
+    </div>
+  </div>`;
+}
+
 function renderMisPedidos(){
   const filtro=document.getElementById('filter-mis-pedidos')?.value||'';
   const q=(document.getElementById('buscar-mis-pedidos')?.value||'').toLowerCase().trim();
@@ -7192,7 +7236,7 @@ function renderMisPedidos(){
         <div style="font-size:28px;font-weight:800;line-height:1.1">${misHoy}</div>
       </div>
       <button class="btn" style="background:#fff;color:#4f46e5;font-weight:700;padding:12px 22px;font-size:15px" onclick="navigate('nuevo-pedido')"><i class="bi bi-cart-plus-fill"></i> Nuevo Pedido</button>
-    </div>`;
+    </div>`+resumenMisVentas(todosMisPeds, filtroMes);
   if(!pedidos.length){el.innerHTML=topBar+`<div class="card"><div class="empty"><div class="empty-icon"><i class="bi bi-bag-x" style="font-size:38px;color:var(--muted)"></i></div><h3>${q?'Sin pedidos que coincidan con la búsqueda':filtro?'Sin pedidos con ese estado':'Aún no has registrado pedidos'}</h3></div></div>`;return;}
   let html=topBar;
   pedidos.forEach(ped=>{
