@@ -835,6 +835,21 @@ textarea{resize:vertical}
                 <div style="font-size:11px;color:var(--muted);margin-top:3px">Solo para clientes que ya compraron (nombre y celular deben coincidir). Se descuenta el 10% del precio total del pedido.</div>
               </div>
 
+              <!-- Bloque TikTok Live (solo usuarios marcados como TikTok): obsequio + con/sin envío -->
+              <div id="ped-tiktok-g" style="display:none;margin:4px 0 14px;padding:12px;border:1px solid #d1d5db;border-radius:10px;background:#f9fafb">
+                <div style="font-weight:700;font-size:13px;margin-bottom:8px">🎵 Pedido de TikTok Live</div>
+                <div style="font-size:12px;font-weight:600;margin-bottom:6px">🎁 Obsequio</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap" id="ped-obsequio-btns">
+                  <button type="button" class="btn btn-outline btn-sm obsequio-btn active" data-obs="" onclick="setObsequio('')">Sin obsequio</button>
+                  <button type="button" class="btn btn-outline btn-sm obsequio-btn" data-obs="medias" onclick="setObsequio('medias')">🧦 Medias</button>
+                  <button type="button" class="btn btn-outline btn-sm obsequio-btn" data-obs="plantillas" onclick="setObsequio('plantillas')">👟 Plantillas</button>
+                </div>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px;margin:12px 0 0">
+                  <input type="checkbox" id="ped-tt-envio" style="width:auto;margin:0" onchange="actualizarBloqueTikTok()"> <span>🚚 Con envío</span>
+                </label>
+                <div id="ped-tt-envio-txt" style="font-size:12px;margin-top:4px"></div>
+              </div>
+
               <!-- Cédula del destinatario (se oculta cuando el envío es a oficina) -->
               <div class="form-group" id="ped-cedula-g">
                 <label>Cédula del destinatario</label>
@@ -1288,6 +1303,10 @@ textarea{resize:vertical}
     <div class="form-group" id="u-publi-grp"><label>Nombre en publicidad <span style="font-weight:400;color:var(--muted);font-size:11px">(opcional — solo para vendedores)</span></label>
       <input type="text" id="u-nombre-publi" placeholder="Ej: DEICY 24-03  (déjalo vacío si quieres match automático por primera palabra)">
       <div style="font-size:11px;color:var(--muted);margin-top:4px"><i class="bi bi-info-circle"></i> Debe coincidir EXACTAMENTE con el campo "nombre" de la campaña en Meta. Si tienes vendedores con primer nombre repetido, llena esto para evitar que se mezclen datos en el reporte.</div>
+    </div>
+    <div class="form-group" id="u-tiktok-grp">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;margin:0"><input type="checkbox" id="u-tiktok" style="width:auto;margin:0"> 🎵 Usuario de TikTok Live</label>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px"><i class="bi bi-info-circle"></i> Solo para vendedores. Agrega en "Nuevo Pedido" el obsequio (medias o plantillas) y la casilla de envío. Todo lo demás funciona igual que cualquier colaboradora.</div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="cerrarModal('modal-usuario')">Cancelar</button>
@@ -5176,7 +5195,7 @@ function renderUsuarios(){
           ? `<td><button class="btn btn-sm" style="background:#10b981;color:#fff;font-weight:600;padding:6px 10px;font-size:12px;border:none;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px" onclick="exportarExcelColaborador('${u.id}')" title="Descargar hoja de cálculo del vendedor (corte 28 a 27)"><i class="bi bi-file-earmark-excel-fill"></i> Excel</button></td>`
           : `<td style="color:var(--muted);font-size:12px">—</td>`)
       : '';
-    html+=`<tr><td><strong>${u.nombre}</strong>${isMe?' <span class="badge badge-info">Tú</span>':''}</td><td style="font-family:monospace;font-size:12px">${u.username}</td><td>${u.rol==='admin'?'<span class="badge badge-purple">Administrador</span>':u.rol==='vendedor'?'<span class="badge badge-info">Vendedor</span>':'<span class="badge badge-gray">Operador</span>'}</td><td>${u.activo?'<span class="badge badge-success">Activo</span>':'<span class="badge badge-danger">Inactivo</span>'}</td>${reporteCell}<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="abrirModalUsuario('${u.id}')" title="Editar"><i class="bi bi-pencil-fill"></i></button>${!isMe?`<button class="btn-icon" onclick="toggleUser('${u.id}')" title="${u.activo?'Desactivar':'Activar'}"><i class="bi bi-${u.activo?'lock-fill':'unlock-fill'}"></i></button>`:''}${!isMe?`<button class="btn-icon" style="color:var(--danger)" onclick="pedirEliminarUser('${u.id}')" title="Eliminar"><i class="bi bi-trash-fill"></i></button>`:''}</div></td></tr>`;
+    html+=`<tr><td><strong>${u.nombre}</strong>${isMe?' <span class="badge badge-info">Tú</span>':''}</td><td style="font-family:monospace;font-size:12px">${u.username}</td><td>${u.rol==='admin'?'<span class="badge badge-purple">Administrador</span>':u.rol==='vendedor'?'<span class="badge badge-info">Vendedor</span>'+(u.canalTikTok?' <span class="badge" style="background:#111;color:#fff">🎵 TikTok</span>':''):'<span class="badge badge-gray">Operador</span>'}</td><td>${u.activo?'<span class="badge badge-success">Activo</span>':'<span class="badge badge-danger">Inactivo</span>'}</td>${reporteCell}<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="abrirModalUsuario('${u.id}')" title="Editar"><i class="bi bi-pencil-fill"></i></button>${!isMe?`<button class="btn-icon" onclick="toggleUser('${u.id}')" title="${u.activo?'Desactivar':'Activar'}"><i class="bi bi-${u.activo?'lock-fill':'unlock-fill'}"></i></button>`:''}${!isMe?`<button class="btn-icon" style="color:var(--danger)" onclick="pedirEliminarUser('${u.id}')" title="Eliminar"><i class="bi bi-trash-fill"></i></button>`:''}</div></td></tr>`;
   });
   wrap.innerHTML=html+'</tbody></table>';
 }
@@ -5192,15 +5211,20 @@ function abrirModalUsuario(id){
     document.getElementById('u-pin').value='';
     document.getElementById('u-rol').value=u.rol;
     document.getElementById('u-nombre-publi').value=u.nombrePubli||'';
+    document.getElementById('u-tiktok').checked=!!u.canalTikTok;
   } else {
     document.getElementById('mu-title').textContent='Nuevo Usuario';
     ['u-nombre','u-user','u-pin','u-nombre-publi'].forEach(x=>document.getElementById(x).value='');
     document.getElementById('u-rol').value='vendedor';
+    document.getElementById('u-tiktok').checked=false;
   }
   // Mostrar el campo solo para vendedores
   const toggleCampo=()=>{
+    const esV=document.getElementById('u-rol').value==='vendedor';
     const grp=document.getElementById('u-publi-grp');
-    if(grp) grp.style.display = document.getElementById('u-rol').value==='vendedor' ? 'block' : 'none';
+    if(grp) grp.style.display = esV ? 'block' : 'none';
+    const gt=document.getElementById('u-tiktok-grp');
+    if(gt) gt.style.display = esV ? 'block' : 'none';
   };
   toggleCampo();
   document.getElementById('u-rol').onchange = toggleCampo;
@@ -5213,6 +5237,7 @@ function guardarUsuario(){
   const pin=document.getElementById('u-pin').value;
   const rol=document.getElementById('u-rol').value;
   const nombrePubli=document.getElementById('u-nombre-publi').value.trim();
+  const canalTikTok = rol==='vendedor' && !!document.getElementById('u-tiktok')?.checked;
   if(!nombre||!username){toast('Nombre y usuario son requeridos');return;}
   const users=getUsers();
 
@@ -5230,7 +5255,7 @@ function guardarUsuario(){
         toast('❌ No puedes cambiar el rol del único Administrador. Debe haber al menos uno.');
         return;
       }
-      const updated={...u, nombre, username, rol, nombrePubli};
+      const updated={...u, nombre, username, rol, nombrePubli, canalTikTok};
       if(pin) updated.pin=pin;
       writeUser(updated);
     }
@@ -5238,7 +5263,7 @@ function guardarUsuario(){
   } else {
     if(!pin||pin.length<4){toast('PIN mínimo 4 caracteres');return;}
     if(users.find(u=>u.username===username)){toast('Usuario ya existe');return;}
-    writeUser({id:uid(), nombre, username, pin, rol, nombrePubli, activo:true});
+    writeUser({id:uid(), nombre, username, pin, rol, nombrePubli, canalTikTok, activo:true});
     toast('Usuario creado');
   }
   cerrarModal('modal-usuario');
@@ -6056,6 +6081,7 @@ function renderCarrito(){
     unlockPedidoStep2();
   }
   onBonoChange(); // refresca el resumen del bono (precio normal / descuento / total) con el carrito actual
+  actualizarBloqueTikTok();
 }
 
 // ── Tipo de destino ────────────────────────
@@ -6179,6 +6205,45 @@ function onBonoChange(){
   else if(r.estado==='incompleto') st.innerHTML=`<span style="color:var(--muted);font-size:11px">Completa el nombre y el celular (10 dígitos) para verificar que es cliente anterior.</span>`;
   else if(r.estado==='nombre_distinto') st.innerHTML=`<span class="addr-err"><i class="bi bi-x-circle-fill"></i> Ese celular está registrado a nombre de "${r.previo.cliente.nombre}". El nombre debe coincidir para aplicar el bono.</span>`;
   else st.innerHTML=`<span class="addr-err"><i class="bi bi-x-circle-fill"></i> No hay compras anteriores con ese celular: el bono es solo para clientes que recompran.</span>`;
+}
+// ── TikTok Live ──────────────────────────────────────────────────────────
+// Los usuarios marcados como TikTok ven en "Nuevo Pedido" el obsequio (medias o
+// plantillas, solo se registra: NO descuenta inventario) y la casilla de envío:
+//   marcada  = "con envío": el envío lo asumimos nosotros.
+//   sin marcar = "sin envío": el cliente paga el envío.
+let _obsequioSel='';
+function esUsuarioTikTok(){ return !!(CU && CU.rol==='vendedor' && CU.canalTikTok===true); }
+function setObsequio(tipo){
+  _obsequioSel=(tipo==='medias'||tipo==='plantillas')?tipo:'';
+  document.querySelectorAll('.obsequio-btn').forEach(b=>{
+    const on=(b.dataset.obs||'')===_obsequioSel;
+    b.classList.toggle('active',on);
+    b.style.background=on?'#111':''; b.style.color=on?'#fff':'';
+  });
+}
+function actualizarBloqueTikTok(){
+  const g=document.getElementById('ped-tiktok-g'); if(!g) return;
+  g.style.display=esUsuarioTikTok()?'block':'none';
+  const chk=document.getElementById('ped-tt-envio'), txt=document.getElementById('ped-tt-envio-txt');
+  if(chk&&txt){
+    txt.innerHTML=chk.checked
+      ? '<span style="color:#15803d"><b>Con envío</b> — nosotros asumimos el costo del envío.</span>'
+      : '<span style="color:#b45309"><b>Sin envío</b> — el cliente paga el envío.</span>';
+  }
+}
+function resetBloqueTikTok(){
+  setObsequio('');
+  const chk=document.getElementById('ped-tt-envio'); if(chk) chk.checked=false;
+  actualizarBloqueTikTok();
+}
+function tiktokBadges(ped){
+  if(!ped||ped.canal!=='tiktok') return '';
+  const obs=ped.obsequio==='medias'?'🧦 Obsequio: Medias':ped.obsequio==='plantillas'?'👟 Obsequio: Plantillas':'';
+  return ` <span class="badge" style="background:#111;color:#fff;font-size:9px;padding:2px 6px;margin-left:4px;font-weight:700" title="Pedido de TikTok Live">🎵 TIKTOK</span>`
+    + (obs?` <span class="badge" style="background:#ede9fe;color:#5b21b6;font-size:9px;padding:2px 6px;margin-left:4px;font-weight:700">${obs}</span>`:'')
+    + (ped.envioIncluido
+        ? ` <span class="badge" style="background:#dcfce7;color:#166534;font-size:9px;padding:2px 6px;margin-left:4px;font-weight:700" title="El envío lo asumimos nosotros">🚚 CON ENVÍO</span>`
+        : ` <span class="badge" style="background:#fef3c7;color:#92400e;font-size:9px;padding:2px 6px;margin-left:4px;font-weight:700" title="El cliente paga el envío">💲 SIN ENVÍO (cliente paga)</span>`);
 }
 function bonoBadge(ped){
   return (ped&&ped.bonoFidelizacion)?` <span class="badge" style="background:#fef3c7;color:#92400e;font-size:9px;padding:2px 6px;margin-left:4px;font-weight:700;border:1px solid #fcd34d" title="Pedido de recompra con bono de fidelización ${ped.bonoPorcentaje||BONO_FIDELIZACION_PCT}% ya descontado del precio">🎁 BONO ${ped.bonoPorcentaje||BONO_FIDELIZACION_PCT}%</span>`:'';
@@ -6794,6 +6859,8 @@ function registrarPedido(){
     cambioGuiaCliente: tipoVenta==='cambio' && _cambioGuiaInfo ? _cambioGuiaInfo : null,
     // Marca de pedido con bota(s) externa(s) (fuera del inventario)
     botaExterna: hayExterna,
+    // Pedido de TikTok Live: canal, obsequio (solo registro, sin stock) y quién paga el envío.
+    ...(esUsuarioTikTok() ? { canal:'tiktok', obsequio:_obsequioSel, envioIncluido:!!document.getElementById('ped-tt-envio')?.checked } : {}),
     // Bono de fidelización: el 10 % se descuenta del TOTAL del pedido (precioVenta queda
     // con el precio final). Se guardan el precio normal y el descuento para mostrarlos.
     // Los precios por ítem no se tocan (son los que escribió la vendedora).
@@ -6902,6 +6969,7 @@ function registrarPedido(){
     const dd=document.getElementById('ped-ciudad-dropdown');if(dd)dd.style.display='none';
     ['tel-status','dir-status','cart-precio-status','bono-status'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='';});
     const chkBono=document.getElementById('ped-bono'); if(chkBono) chkBono.checked=false;
+    resetBloqueTikTok();
     document.getElementById('ped-forma-pago').value='';
     const radDom=document.querySelector('input[name="ped-destino-tipo"][value="domicilio"]');
     if(radDom){radDom.checked=true;onDestinoTipo('domicilio');}
@@ -7139,7 +7207,7 @@ function renderMisPedidos(){
           <div style="font-weight:700;font-size:15px">${pedResumenCorto(ped)}</div>
           <div style="font-size:12px;color:var(--muted)">${Array.isArray(ped.items)&&ped.items.length>1?ped.items.length+' productos · ':('Talla '+ped.talla+' / '+ped.color+' · ')}${fmtD(ped.fecha)}${ped.ts?` · <i class="bi bi-clock"></i> ${fmtT(ped.ts)}`:''}</div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${bonoBadge(ped)}${estadoBadgeVisual(ped)}</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${tiktokBadges(ped)}${bonoBadge(ped)}${estadoBadgeVisual(ped)}</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;margin-bottom:12px">
         <div><span style="color:var(--muted)">Cliente:</span> <strong>${ped.cliente.nombre}</strong></div>
@@ -7544,7 +7612,7 @@ function renderAdminPedidos(){
     html+=`<tr${ped.backorderPendiente?' style="background:#fef2f2"':ped.precioBajo?' style="background:#fffbeb"':''}>
       <td style="text-align:center;color:var(--muted);font-size:12px">${idx+1}</td>
       <td style="white-space:nowrap;font-size:12px">${fmtD(ped.fecha)}${ped.ts?`<div style="font-size:10px;color:var(--muted);margin-top:2px"><i class="bi bi-clock"></i> ${fmtT(ped.ts)}</div>`:''}</td>
-      <td><div style="font-size:13px">${pedResumen(ped)}${comboBadge}${backorderBadge}${bonoBadge(ped)}</div>${paresInfo}</td>
+      <td><div style="font-size:13px">${pedResumen(ped)}${comboBadge}${backorderBadge}${bonoBadge(ped)}${tiktokBadges(ped)}</div>${paresInfo}</td>
       <td><strong>${ped.cliente.nombre}</strong><div style="font-size:11px;color:var(--muted)">${ped.cliente.telefono}</div>
           <div style="font-size:10px;color:var(--muted)">${ped.cliente.barrio||''}${ped.cliente.ciudad?', '+ped.cliente.ciudad:''}</div></td>
       <td style="font-size:12px">${ped.cliente.ciudad||'—'}</td>
@@ -7603,7 +7671,7 @@ function verDetallePedido(id){
           </div>
         </div>`;
       }).join('')}
-      <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${estadoBadgeVisual(ped)}${bonoBadge(ped)}</div>
+      <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${estadoBadgeVisual(ped)}${bonoBadge(ped)}${tiktokBadges(ped)}</div>
     </div>
     <div class="card" style="padding:14px"><div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600">CLIENTE Y ENVÍO</div>
       <div style="font-weight:700">${ped.cliente.nombre}</div>
