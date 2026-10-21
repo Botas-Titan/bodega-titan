@@ -27,6 +27,7 @@
 <!-- Firebase compat (no requiere npm ni build) -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -338,12 +339,13 @@ textarea{resize:vertical}
       <p>Sistema de Gestión de Inventario</p>
     </div>
     <div class="form-group">
-      <label>Usuario</label>
-      <input type="text" id="login-user" placeholder="Nombre de usuario" autocomplete="username">
+      <label>Correo</label>
+      <input type="email" id="login-user" placeholder="nombre@bodegatitan.com" autocomplete="username"
+             onkeydown="if(event.key==='Enter')doLogin()">
     </div>
     <div class="form-group">
-      <label>PIN</label>
-      <input type="password" id="login-pin" placeholder="••••••" maxlength="8"
+      <label>Contraseña</label>
+      <input type="password" id="login-pin" placeholder="••••••••" autocomplete="current-password"
              onkeydown="if(event.key==='Enter')doLogin()">
     </div>
     <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:14px;cursor:pointer;font-weight:400">
@@ -1775,6 +1777,10 @@ const firebaseConfig = {
 
 let db = null;
 let firebaseInitOk = false;
+// Datos del nodo titanbotas/acceso/<uid> de la cuenta que inició sesión.
+// Se llena en bootApp() ANTES de leer la base, porque las reglas de Firebase
+// exigen sesión iniciada para todo.
+let ACCESO_ACTUAL = null;
 try {
   if (typeof firebase === 'undefined') throw new Error('Firebase no cargó (sin internet o CDN bloqueado)');
   firebase.initializeApp(firebaseConfig);
@@ -2214,19 +2220,21 @@ function onDataReady() {
   }
   // Seed demo data if empty
   if (!localProds.length) seedDemo();
-  // Restore session — localStorage tiene prioridad (sesión recordada), si no busca sessionStorage
-  try {
-    const s = localStorage.getItem('tb_session') || sessionStorage.getItem('tb_session');
-    if (s) {
-      CU = JSON.parse(s);
-      // Verificar que el usuario aún existe y está activo
-      const stillValid = localUsers.find(x => x.id===CU.id && x.activo);
-      if (stillValid) { showApp(); return; }
-      // Si el usuario fue eliminado o desactivado, limpiar la sesión
-      localStorage.removeItem('tb_session');
-      sessionStorage.removeItem('tb_session');
+
+  // La sesión la manda Firebase Authentication. ACCESO_ACTUAL se llenó en
+  // bootApp() a partir de titanbotas/acceso/<uid> antes de leer la base.
+  if (ACCESO_ACTUAL && ACCESO_ACTUAL.usuarioId) {
+    const perfil = localUsers.find(x => x.id === ACCESO_ACTUAL.usuarioId && x.activo);
+    if (perfil) {
+      CU = {id:perfil.id, nombre:perfil.nombre, username:perfil.username, rol:perfil.rol};
+    } else {
+      // Sin perfil en titanbotas/usuarios: usamos lo que diga el nodo de acceso
+      CU = {id:ACCESO_ACTUAL.usuarioId, nombre:ACCESO_ACTUAL.nombre||'Usuario',
+            username:ACCESO_ACTUAL.usuarioId, rol:ACCESO_ACTUAL.rol||'vendedor'};
     }
-  } catch(e) {}
+    showApp();
+    return;
+  }
   document.getElementById('login-screen').style.display = 'flex';
 }
 
@@ -2531,32 +2539,38 @@ function writeGuia(guia) {
 let CU = null;
 
 function doLogin() {
-  const u = document.getElementById('login-user').value.trim().toLowerCase();
-  const p = document.getElementById('login-pin').value;
-  const remember = document.getElementById('login-remember')?.checked;
-  const user = localUsers.find(x => x.username.toLowerCase()===u && x.pin===p && x.activo);
-  if (!user) {
-    document.getElementById('login-error').textContent='Usuario o PIN incorrecto';
-    document.getElementById('login-pin').value='';
-    return;
-  }
-  CU = {id:user.id,nombre:user.nombre,username:user.username,rol:user.rol};
-  const serialized = JSON.stringify(CU);
-  if (remember) {
-    localStorage.setItem('tb_session', serialized);
-    sessionStorage.removeItem('tb_session');
-  } else {
-    sessionStorage.setItem('tb_session', serialized);
-    localStorage.removeItem('tb_session');
-  }
-  showApp();
+  const correo = document.getElementById('login-user').value.trim();
+  const clave  = document.getElementById('login-pin').value;
+  const recordar = document.getElementById('login-remember')?.checked;
+  const errEl = document.getElementById('login-error');
+  if (!correo || !clave) { errEl.textContent='Escribe tu correo y tu contraseña'; return; }
+  errEl.textContent='Entrando...';
+  const persistencia = recordar
+    ? firebase.auth.Auth.Persistence.LOCAL
+    : firebase.auth.Auth.Persistence.SESSION;
+  firebase.auth().setPersistence(persistencia)
+    .then(()=> firebase.auth().signInWithEmailAndPassword(correo, clave))
+    .then(()=>{ errEl.textContent=''; /* onAuthStateChanged continúa el arranque */ })
+    .catch(e=>{
+      console.error('[LOGIN]', e);
+      const cod = e && e.code || '';
+      errEl.textContent =
+        (cod==='auth/invalid-email') ? 'El correo no tiene un formato válido' :
+        (cod==='auth/user-disabled') ? 'Esta cuenta está desactivada' :
+        (cod==='auth/network-request-failed') ? 'Sin conexión a internet' :
+        (cod==='auth/too-many-requests') ? 'Demasiados intentos. Espera unos minutos' :
+        'Correo o contraseña incorrectos';
+      document.getElementById('login-pin').value='';
+    });
 }
 
 function doLogout() {
   CU=null;
   sessionStorage.removeItem('tb_session');
   localStorage.removeItem('tb_session');
-  location.reload();
+  try {
+    firebase.auth().signOut().then(()=>location.reload()).catch(()=>location.reload());
+  } catch(e) { location.reload(); }
 }
 function isAdmin()   { return CU?.rol==='admin'; }
 function isVendedor(){ return CU?.rol==='vendedor'; }
@@ -10911,7 +10925,40 @@ async function exportarExcelTodosColaboradores(){
 //  ARRANQUE DE LA APP
 // ════════════════════════════════════════
 function bootApp() {
-  initListeners();
+  const msg = document.getElementById('loading-msg');
+  const bar = document.getElementById('loading-bar');
+
+  if (!firebaseInitOk) { initListeners(); return; }
+
+  function mostrarLogin(textoError) {
+    const pantalla = document.getElementById('loading-overlay');
+    if (pantalla) pantalla.style.display = 'none';
+    if (bar) bar.style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    if (textoError) document.getElementById('login-error').textContent = textoError;
+  }
+  window._mostrarLoginBodega = mostrarLogin;
+
+  firebase.auth().onAuthStateChanged(function(user){
+    if (!user) { ACCESO_ACTUAL = null; mostrarLogin(''); return; }
+    if (msg) msg.textContent = 'Verificando permisos...';
+    db.ref('titanbotas/acceso/' + user.uid).once('value')
+      .then(function(snap){
+        const acceso = snap.val();
+        if (!acceso) {
+          return firebase.auth().signOut().then(function(){
+            mostrarLogin('Esta cuenta no tiene acceso a la bodega. Pídele al administrador que la habilite.');
+          });
+        }
+        ACCESO_ACTUAL = acceso;
+        if (msg) msg.textContent = 'Cargando inventario...';
+        initListeners();
+      })
+      .catch(function(e){
+        console.error('[ACCESO]', e);
+        mostrarLogin('No se pudo verificar tu acceso. Revisa tu conexión e intenta de nuevo.');
+      });
+  });
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bootApp);
