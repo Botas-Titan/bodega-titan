@@ -515,7 +515,9 @@ function suscribir() {
   db.ref(`${R}/publicidad/historico`).orderByKey().startAt(desde).on('value', (s) => { D.publi = s.val() || {}; if (TAB === 'vend') renderVend(); });
   db.ref(`${R}/publicidad/snapshot/updatedAt`).on('value', (s) => { D.publiEstado = s.val(); if (TAB === 'vend') renderVend(); });
   db.ref(`${R}/metricas/bot/dias`).orderByKey().startAt(desde).on('value', (s) => { D.bot = s.val() || {}; if (TAB === 'vend') renderVend(); });
-  db.ref(`${R}/conversaciones`).on('value', (s) => { D.convs = s.val() || {}; pintarTabs(); if (TAB === 'chats') renderChats(); });
+  // El vendedor solo puede consultar los chats asignados a él (reglas de Firebase)
+  const qConv = esAdmin() ? db.ref(`${R}/conversaciones`) : db.ref(`${R}/conversaciones`).orderByChild('asignadoA').equalTo(CU.id);
+  qConv.on('value', (s) => { D.convs = s.val() || {}; pintarTabs(); if (TAB === 'chats') renderChats(); });
   db.ref(`${R}/publicidad/anuncios`).on('value', (s) => { D.anuncios = s.val() || {}; if (TAB === 'chats') renderChats(); });
   db.ref(`${R}/config/respuestasRapidas`).on('value', (s) => { D.rr = s.val() || {}; if (TAB === 'kb' && !KB_EDIT) renderKB(); });
   db.ref(`${R}/usuarios`).once('value').then((s) => { D.usuarios = vals(s.val()); if (TAB === 'reparto') renderReparto(); })
