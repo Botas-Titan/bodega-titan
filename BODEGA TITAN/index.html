@@ -2111,7 +2111,15 @@ function initListeners() {
     if (fbReady && currentPage==='usuarios') renderUsuarios();
   }, onListenerError);
 
-  REF.pedidos.on('value', snap => {
+  // Las reglas de Firebase solo dejan a un vendedor leer SUS pedidos, mediante
+  // una consulta filtrada por vendedorId. Si pidiera la rama completa (como
+  // hace el admin) Firebase se la niega y la app se queda cargando para
+  // siempre. Por eso cada rol consulta distinto.
+  const _rolEsAdmin = (ACCESO_ACTUAL && ACCESO_ACTUAL.rol === 'admin');
+  const _consultaPedidos = _rolEsAdmin
+    ? REF.pedidos
+    : REF.pedidos.orderByChild('vendedorId').equalTo(ACCESO_ACTUAL ? ACCESO_ACTUAL.usuarioId : '__sin_acceso__');
+  _consultaPedidos.on('value', snap => {
     const val = snap.val();
     localPedidos = val ? Object.values(val).sort((a,b)=>(b.ts||0)-(a.ts||0)) : [];
     pedidosOk = true;
@@ -2137,11 +2145,17 @@ function initListeners() {
 
   // Compras a proveedores: dato secundario (no participa en checkReady) para
   // no retrasar el arranque de la app si esta rama del árbol tarda en llegar.
-  REF.compras.on('value', snap => {
-    const val = snap.val();
-    localCompras = val ? Object.values(val).sort((a,b)=>(b.ts||0)-(a.ts||0)) : [];
-    if (fbReady) { showSync(); refreshPage(); updateBadges(); }
-  }, onListenerError);
+  // Compras y alertas son ramas de solo-admin en las reglas. Suscribirlas
+  // siendo vendedor devuelve permiso denegado y dispara el bucle de reintentos.
+  if (_rolEsAdmin) {
+    REF.compras.on('value', snap => {
+      const val = snap.val();
+      localCompras = val ? Object.values(val).sort((a,b)=>(b.ts||0)-(a.ts||0)) : [];
+      if (fbReady) { showSync(); refreshPage(); updateBadges(); }
+    }, onListenerError);
+  } else {
+    localCompras = [];
+  }
 
   // Alertas de stock (backorders cubiertos, ventas sin stock, transacciones
   // abortadas...): dato secundario, no participa en checkReady.
@@ -2150,11 +2164,15 @@ function initListeners() {
     actualizarBotonBackorder();
   }, onListenerError);
 
-  REF.alertas.on('value', snap => {
-    const val = snap.val();
-    localAlertas = val ? Object.values(val).sort((a,b)=>(b.ts||0)-(a.ts||0)) : [];
-    if (fbReady && currentPage==='alertas') renderAlertas();
-  }, onListenerError);
+  if (_rolEsAdmin) {
+    REF.alertas.on('value', snap => {
+      const val = snap.val();
+      localAlertas = val ? Object.values(val).sort((a,b)=>(b.ts||0)-(a.ts||0)) : [];
+      if (fbReady && currentPage==='alertas') renderAlertas();
+    }, onListenerError);
+  } else {
+    localAlertas = [];
+  }
 }
 
 // Un pedido que ya salió (guía, enviado, entregado, novedad, devolución o
