@@ -1,4 +1,4 @@
-name: Deploy a GitHub Pages site con una rama
+name: Publicar app (Firebase Hosting + GitHub Pages)
 
 on:
   push:
@@ -15,36 +15,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  publicar:
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       # Reescribe APP_VERSION con la fecha/hora del despliegue. Sin esto, las
-      # pestañas ya abiertas seguirían ejecutando el código anterior y
-      # escribirían el inventario con la versión vieja (causa de los
-      # descuadres de stock). Solo modifica el archivo que se publica, no el
-      # repositorio, así que no hay nada que recordar al subir un cambio.
-      - name: Inyectar versión
+      # pestanas ya abiertas seguirian ejecutando el codigo anterior y
+      # escribirian el inventario con la version vieja (causa de los
+      # descuadres de stock).
+      - name: Inyectar version
         run: |
           set -e
           VER=$(date -u +'%Y.%m.%d.%H%M')
-          # Se busca el index.html que declara APP_VERSION en lugar de fijar la
-          # ruta, así el paso sigue funcionando si la carpeta se mueve o cambia
-          # de nombre.
           FILE=$(grep -rl "^const APP_VERSION = '" --include=index.html . | head -1)
           if [ -z "$FILE" ]; then
-            echo "::error::No se encontró ningún index.html con APP_VERSION"; exit 1
+            echo "::error::No se encontro ningun index.html con APP_VERSION"; exit 1
           fi
           sed -i "s/^const APP_VERSION = '[^']*';/const APP_VERSION = '$VER';/" "$FILE"
           grep -q "const APP_VERSION = '$VER';" "$FILE" \
             || { echo "::error::No se pudo inyectar APP_VERSION en $FILE"; exit 1; }
-          echo "Versión publicada: $VER  ($FILE)"
+          echo "Version publicada: $VER  ($FILE)"
 
+      # --- Destino principal: Firebase Hosting (sitio bodega-titan-app) ---
+      - name: Desplegar a Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: bodegatitan-2d932
+          channelId: live
+
+      # --- Destino de respaldo: GitHub Pages ---
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
