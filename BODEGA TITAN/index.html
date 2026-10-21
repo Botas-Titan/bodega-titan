@@ -1912,13 +1912,23 @@ async function vigilarArchivoPublicado(){
   if(location.protocol==='file:') return;
   _firmaArchivo = await firmaDelArchivoPublicado();
   if(!_firmaArchivo) return;
-  setInterval(async ()=>{
-    if(appBloqueadaPorVersion) return;
+  // Antes: una petición cada 2 min por pestaña abierta, incluso en segundo plano.
+  // Con muchos vendedores detrás de la misma IP eso hacía que GitHub Pages
+  // respondiera "Rate limit exceeded". Ahora: solo con la pestaña visible, cada
+  // 10 min, y al volver a la pestaña si pasaron más de 5 min desde la última revisión.
+  let _ultimaRevision = Date.now();
+  const revisar = async ()=>{
+    if(appBloqueadaPorVersion || document.hidden) return;
+    _ultimaRevision = Date.now();
     const actual = await firmaDelArchivoPublicado();
     if(!actual || actual===_firmaArchivo) return;
     console.log('[VERSIÓN] El archivo publicado cambió:', _firmaArchivo, '→', actual);
     bloquearYRecargar('archivo-'+actual);
-  }, 120000);
+  };
+  setInterval(revisar, 600000);
+  document.addEventListener('visibilitychange', ()=>{
+    if(!document.hidden && Date.now()-_ultimaRevision > 300000) revisar();
+  });
 }
 
 // Bloquea la pestaña y la recarga una sola vez por publicación detectada.
