@@ -1,0 +1,27 @@
+{
+  "hosting": {
+    "site": "bodega-titan-app",
+    "public": "BODEGA TITAN",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "**/README.md"],
+    "headers": [
+      {
+        "source": "/index.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache" }
+        ]
+      },
+      {
+        "source": "/manifest.webmanifest",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache" }
+        ]
+      },
+      {
+        "source": "**/*.@(png|jpg|jpeg|webp|svg|ico)",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=604800" }
+        ]
+      }
+    ]
+  }
+}
