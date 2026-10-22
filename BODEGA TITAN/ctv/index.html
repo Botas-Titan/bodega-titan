@@ -307,6 +307,25 @@ svg text{fill:var(--muted);font-size:10px;font-family:Inter,sans-serif}
 .nvel{flex:none;border:none;border-radius:99px;background:rgba(255,255,255,.16);color:var(--wa-txt);font-size:12px;font-weight:700;padding:4px 8px;cursor:pointer;min-width:40px}
 .ltit .avisos{margin-left:auto;font-size:12px;align-self:center}
 #avisosHdr .avisos{font-size:12px}
+
+/* conexión */
+#avisoRed{position:fixed;left:50%;top:calc(8px + env(safe-area-inset-top));transform:translateX(-50%);z-index:60;background:#7c2d12;color:#fff;padding:8px 14px;border-radius:99px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.4);max-width:92vw;text-align:center}
+.medcarga{width:220px;height:120px;border-radius:8px;background:rgba(255,255,255,.06);display:grid;place-items:center;color:var(--wa-sub);font-size:13px;margin-bottom:4px}
+/* etiquetas y recordatorios */
+.badge.et{background:color-mix(in srgb,var(--c) 22%,transparent);color:color-mix(in srgb,var(--c) 80%,#fff)}
+.badge.rc{background:#1e293b;color:#93c5fd}.badge.rv{background:#7f1d1d;color:#fecaca}
+.hoja-fondo{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:70}
+.hoja{position:fixed;left:0;right:0;bottom:0;z-index:71;background:#1c1c1e;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom));max-height:85vh;overflow:auto;max-width:560px;margin:0 auto;color:var(--wa-txt)}
+.hoja-t{display:flex;justify-content:space-between;align-items:center;font-size:17px}
+.hoja-s{font-size:12px;color:var(--wa-sub);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 8px}
+.etqs,.recs{display:flex;flex-wrap:wrap;gap:8px}
+.etq{border:1px solid #3a3a3c;background:#2c2c2e;color:#e5e5ea;border-radius:99px;padding:7px 12px;font-size:14px;cursor:pointer}
+.etq.on{background:color-mix(in srgb,var(--c) 30%,#2c2c2e);border-color:var(--c);color:#fff}
+.etq.mas{border-style:dashed;color:var(--wa-sub)}
+.citem{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.conjs{display:flex;flex-direction:column;gap:10px}
+.conj{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.conj .etq{font-size:13px;padding:5px 10px}
 .rrh{display:flex;justify-content:space-between;align-items:center;padding:6px 8px 6px 14px;color:var(--wa-txt);font-size:13px;border-bottom:1px solid var(--wa-linea);position:sticky;top:0;background:inherit}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#22262f;border:1px solid var(--line);padding:10px 16px;border-radius:10px;z-index:20;font-size:13px;box-shadow:0 8px 30px rgba(0,0,0,.4)}
 .empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:var(--r)}
@@ -518,7 +537,12 @@ function suscribir() {
   // El vendedor solo puede consultar los chats asignados a él (reglas de Firebase)
   const qConv = esAdmin() ? db.ref(`${R}/conversaciones`) : db.ref(`${R}/conversaciones`).orderByChild('asignadoA').equalTo(CU.id);
   qConv.on('value', (s) => { D.convs = s.val() || {}; pintarTabs(); if (TAB === 'chats') renderChats(); });
-  db.ref(`${R}/publicidad/anuncios`).on('value', (s) => { D.anuncios = s.val() || {}; if (TAB === 'chats') renderChats(); });
+  db.ref(`${R}/config/etiquetas`).on('value', (s) => { D.etiquetas = s.val() || {}; if (TAB === 'chats') renderChats(); if (MENU) pintarMenu(); });
+  if (esAdmin()) db.ref(`${R}/config/ctv/mediosMigrados`).once('value').then((s) => {
+    // Una sola vez: pasar los archivos viejos fuera de los mensajes para que el CTV cargue rápido
+    if (!s.val() && !store.get('ctv_migrar_pedido')) { store.set('ctv_migrar_pedido', Date.now()); db.ref(`${R}/ctv/migrarMedios`).push({ por: CU.nombre, at: Date.now() }); }
+  }).catch(() => {});
+  db.ref(`${R}/publicidad/anuncios`).on('value', (s) => { D.anuncios = s.val() || {}; if (TAB === 'chats') renderChats(); if (TAB === 'reparto' && !REP_EDIT) renderReparto(); });
   db.ref(`${R}/config/respuestasRapidas`).on('value', (s) => { D.rr = s.val() || {}; if (TAB === 'kb' && !KB_EDIT) renderKB(); });
   db.ref(`${R}/usuarios`).once('value').then((s) => { D.usuarios = vals(s.val()); if (TAB === 'reparto') renderReparto(); })
     .catch(() => { D.usuarios = [{ id: CU.id, nombre: CU.nombre, rol: CU.rol, nombrePubli: CU.nombrePubli }]; });
@@ -1041,11 +1065,44 @@ function renderReparto() {
       const v = cfg.vendedores?.[u.id] || {}, n = hoyC[u.id] || 0;
       return `<tr style="cursor:default"><td><b>${esc(u.nombre)}</b></td>
         <td style="text-align:center"><label class="sw" style="display:inline-block;vertical-align:middle"><input type="checkbox" ${v.publicidad ? 'checked' : ''} onchange="db.ref('${R}/config/reparto/vendedores/${u.id}').update({nombre:'${esc(u.nombre).replace(/'/g, '')}',publicidad:this.checked})"><span></span></label></td>
-        <td><input type="number" min="0" style="width:80px;text-align:right" value="${v.cupo || 0}" onfocus="REP_EDIT=true" onblur="REP_EDIT=false" onchange="db.ref('${R}/config/reparto/vendedores/${u.id}').update({nombre:'${esc(u.nombre).replace(/'/g, '')}',cupo:Math.max(0,Number(this.value)||0)})"></td>
+        <td><input type="number" min="0" style="width:80px;text-align:right" placeholder="sin tope" value="${v.cupo === undefined || v.cupo === null || v.cupo === '' ? '' : v.cupo}" onfocus="REP_EDIT=true" onblur="REP_EDIT=false" onchange="db.ref('${R}/config/reparto/vendedores/${u.id}').update({nombre:'${esc(u.nombre).replace(/'/g, '')}',cupo:this.value===''?null:Math.max(0,Number(this.value)||0)})"></td>
         <td style="min-width:120px">${n}${v.cupo ? ` / ${v.cupo}` : ''}${v.cupo ? barra(n, v.cupo) : ''}</td></tr>`;
     }).join('')}</tbody></table></div>
   <div class="note" style="margin-top:8px">El interruptor de publicidad hoy solo decide quién entra al reparto. Para que además encienda o pause la campaña real en Meta falta conectar el token de Meta.</div>
+  ${seccionConjuntos(vends)}
   ${seccionPerfil()}`;
+}
+/* ---------- Reparto por producto del anuncio (conjunto de anuncios) ---------- */
+let CONJ_TODOS = false, CONJ_BUS = '';
+const claveConj = (s) => String(s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[.#$/\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+function seccionConjuntos(vends) {
+  const reglas = D.reparto?.conjuntos || {};
+  const anuncios = Object.entries(D.anuncios || {});
+  // Campañas que traen chats al número del bot: las de los chats que llegaron por anuncio + "Titan Mensajes"
+  const adsBot = new Set(Object.values(D.convs || {}).map((c) => c.adId).filter(Boolean));
+  const campBot = new Set(anuncios.filter(([id, a]) => adsBot.has(id) || /titan.*mensaj/i.test(a.campana || '')).map(([, a]) => a.campana));
+  const mapa = {};
+  for (const [, a] of anuncios) {
+    if (!a.conjunto || /^nuevo conjunto de anuncios/i.test(a.conjunto)) continue;
+    if (!CONJ_TODOS && !campBot.has(a.campana)) continue;
+    const k = claveConj(a.conjunto); (mapa[k] = mapa[k] || { nombre: a.conjunto, campanas: new Set() }).campanas.add(a.campana);
+  }
+  for (const [k, r] of Object.entries(reglas)) if (!mapa[k] && r?.uids && Object.values(r.uids).some(Boolean)) mapa[k] = { nombre: r.nombre || k, campanas: new Set() };
+  const q = claveConj(CONJ_BUS);
+  const filas = Object.entries(mapa).filter(([k]) => !q || k.includes(q)).sort((a, b) => a[1].nombre.localeCompare(b[1].nombre));
+  const quien = [{ id: 'bot', nombre: '🤖 Marcela' }, ...vends.map((u) => ({ id: u.id, nombre: String(u.nombre).split(' ')[0] }))];
+  return `<div class="section" style="margin-top:26px"><div class="row" style="justify-content:space-between"><h2>Reparto por producto del anuncio</h2>
+      <label class="note" style="margin:0;display:flex;gap:6px;align-items:center"><input type="checkbox" style="width:auto" ${CONJ_TODOS ? 'checked' : ''} onchange="CONJ_TODOS=this.checked;renderReparto()"> ver conjuntos de todas las campañas</label></div>
+    <p class="note" style="margin:6px 0 12px">Cuando un cliente escribe desde un anuncio, se mira su <b>conjunto de anuncios</b> (el producto). Si marcas vendedores para ese conjunto, el chat se reparte <b>solo entre ellos</b> (con publicidad encendida; primero los que tengan cupo libre). Si no marcas a nadie, sigue el reparto normal.</p>
+    <input placeholder="Buscar conjunto…" value="${esc(CONJ_BUS)}" oninput="CONJ_BUS=this.value;clearTimeout(window._cb);window._cb=setTimeout(()=>{renderReparto();const i=document.querySelector('#conjbus');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)" id="conjbus" style="margin-bottom:10px">
+    <div class="conjs">${filas.map(([k, f]) => {
+      const u = reglas[k]?.uids || {};
+      return `<div class="conj"><div><b>${esc(f.nombre)}</b><div class="note">${esc([...f.campanas].filter(Boolean).join(' · '))}</div></div>
+        <div class="etqs">${quien.map((p) => `<button class="etq ${u[p.id] ? 'on' : ''}" style="--c:#f59e0b" onclick="togConj('${k}','${esc(f.nombre).replace(/'/g, '')}','${p.id}',${!u[p.id]})">${esc(p.nombre)}</button>`).join('')}</div></div>`;
+    }).join('') || '<div class="empty">No hay conjuntos para mostrar. Marca "ver conjuntos de todas las campañas".</div>'}</div></div>`;
+}
+function togConj(k, nombre, uid, on) {
+  db.ref(`${R}/config/reparto/conjuntos/${k}`).update({ nombre, [`uids/${uid}`]: on || null }).catch((e) => toast('No se pudo: ' + e.message));
 }
 /* ---------- Perfil de WhatsApp del número del bot ---------- */
 const PERFIL_BASE = {
@@ -1116,33 +1173,36 @@ function listaChats() {
 function renderChats() {
   if (GRAB) { GRAB.pend = true; return; } // no repintar mientras se graba una nota de voz
   const m = $('#main');
-  if (D.convs == null) { m.innerHTML = '<div class="empty">Cargando chats…</div>'; return; }
+  if (D.convs == null) { m.innerHTML = `<div class="empty">Cargando chats…${LENTO ? '<br><br>La conexión está lenta. <button class="btn sm" onclick="location.reload()">Reintentar</button>' : ''}</div>`; return; }
   let lista = listaChats();
   if (CBUS.trim()) { const q = CBUS.trim().toLowerCase(); lista = lista.filter((c) => (c.k + ' ' + (c.datos?.nombre || '') + ' ' + (c.nombre || '')).toLowerCase().includes(q)); }
   const n = { todos: lista.length, noleidos: lista.filter((c) => c.noLeidos).length, ventas: lista.filter((c) => c.etapa === 'venta_cerrada' && !c.pedidoPasado && !c.pedidoId).length,
-    datos: lista.filter((c) => c.etapa === 'faltan_datos').length, pausa: lista.filter(pausado).length };
+    datos: lista.filter((c) => c.etapa === 'faltan_datos').length, pausa: lista.filter(pausado).length, recordar: lista.filter((c) => c.recordatorio?.at).length };
   if (CFILT === 'ventas') lista = lista.filter((c) => c.etapa === 'venta_cerrada' && !c.pedidoPasado && !c.pedidoId);
   if (CFILT === 'datos') lista = lista.filter((c) => c.etapa === 'faltan_datos');
   if (CFILT === 'pausa') lista = lista.filter(pausado);
   if (CFILT === 'noleidos') lista = lista.filter((c) => c.noLeidos);
+  if (CFILT === 'recordar') lista = lista.filter((c) => c.recordatorio?.at).sort((a, b) => a.recordatorio.at - b.recordatorio.at);
+  if (CFILT.startsWith('et:')) lista = lista.filter((c) => c.etiquetas?.[CFILT.slice(3)]);
   const c = CHAT && D.convs[CHAT] ? { k: CHAT, ...D.convs[CHAT] } : null;
 
-  m.innerHTML = `
-  <div class="chats ${c ? 'abierto' : ''}">
+  const html = `
+  <div class="chats ${c ? 'abierto' : ''}" data-chat="${c ? c.k : ''}">
     <div class="clist">
       <div class="lhead">
         <div class="ltit">Chats <small>${esAdmin() ? '322 414 6909' : 'mis chats'}</small>${botonAvisos()}</div>
         <div class="buscar"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <input id="cbus" placeholder="Buscar nombre o número" value="${esc(CBUS)}" oninput="CBUS=this.value;renderChats();setTimeout(()=>{const i=$('#cbus');i.focus();i.setSelectionRange(i.value.length,i.value.length)})"></div>
-        <div class="wachips">${[['todos', 'Todos', n.todos], ['noleidos', 'No leídos', n.noleidos], ['ventas', 'Ventas por pasar', n.ventas], ['datos', 'Pidiendo datos', n.datos], ['pausa', 'Con humano', n.pausa]]
+          <input id="cbus" placeholder="Buscar nombre o número" value="${esc(CBUS)}" oninput="CBUS=this.value;renderChats()"></div>
+        <div class="wachips">${[['todos', 'Todos', n.todos], ['noleidos', 'No leídos', n.noleidos], ['recordar', '⏰ Recordatorios', n.recordar], ['ventas', 'Ventas por pasar', n.ventas], ['datos', 'Pidiendo datos', n.datos], ['pausa', 'Con humano', n.pausa],
+          ...listaEtiquetas().filter((e) => listaChats().some((c) => c.etiquetas?.[e.id])).map((e) => ['et:' + e.id, e.nombre, 0])]
           .map(([k, t, q]) => `<button class="${CFILT === k ? 'on' : ''}" onclick="CFILT='${k}';renderChats()">${t}${q && k !== 'todos' ? ' ' + q : ''}</button>`).join('')}</div>
       </div>
-      ${lista.map((x) => {
+      <div class="citems">${lista.map((x) => {
       const nom = x.datos?.nombre || x.nombre || '+' + x.k;
       const u = x.ult, deMarcela = u && u.direccion === 'out' && ['bot', 'flujo', 'sistema'].includes(u.autor);
       const pre = !u || u.direccion === 'in' ? '' : (deMarcela ? '🤖 ' : '') + chulos(u);
       return `
-      <div class="citem ${x.k === CHAT ? 'on' : ''}" onclick="abrirChat('${x.k}')">
+      <div class="citem ${x.k === CHAT ? 'on' : ''}" data-k="${x.k}" onclick="if(!PRESION.hecho)abrirChat('${x.k}')" oncontextmenu="event.preventDefault();menuChat('${x.k}')" onpointerdown="presionar(event,'${x.k}')" onpointerup="soltarPresion()" onpointerleave="soltarPresion()" onpointercancel="soltarPresion()">
         <div class="ava" style="background:${colorAva(x.k)}">${esc(iniciales(nom))}</div>
         <div style="min-width:0">
           <div class="r1"><span class="n">${esc(nom)}</span><span class="t ${x.noLeidos ? 'nuevo' : ''}">${hora(x.ts)}</span></div>
@@ -1151,16 +1211,39 @@ function renderChats() {
             ${x.etapa === 'venta_cerrada' || x.pedidoId ? `<span class="badge ${x.pedidoPasado || x.pedidoId ? '' : 'v'}">${x.pedidoPasado || x.pedidoId ? '✓ En bodega' : '🟢 Venta cerrada'}</span>` : `<span class="badge">${ETQ[x.etapa] || x.etapa || 'Nuevo'}</span>`}
             ${x.motivoEscalada === 'foto_cliente' ? '<span class="badge p">📷 Mandó foto</span>' : pausado(x) ? '<span class="badge p">⏸ Marcela pausada</span>' : ''}
             ${x.asignadoNombre && esAdmin() ? `<span class="badge">👤 ${esc(String(x.asignadoNombre).split(' ')[0])}</span>` : ''}
+            ${etiquetasHTML(x)}${recordatorioHTML(x)}
             ${x.fuente === 'ctwa' ? `<span class="badge d" title="${esc([anuncioDe(x).campana, anuncioDe(x).conjunto, anuncioDe(x).anuncio].filter(Boolean).join(' › '))}">📣 ${esc(anuncioDe(x).producto || 'Anuncio')}</span>` : ''}
           </div>
         </div>
-      </div>`; }).join('') || '<div class="empty" style="margin:12px">No hay chats en este filtro.</div>'}</div>
+      </div>`; }).join('') || '<div class="empty" style="margin:12px">No hay chats en este filtro.</div>'}</div></div>
     <div class="cview">${c ? vistaChat(c) : '<div class="empty" style="margin:auto">Elige un chat de la lista</div>'}</div>
   </div>`;
+  // Repintado parcial: si es el mismo chat, solo se cambian las partes que cambiaron.
+  // Así el cuadro de texto y el buscador no se reemplazan y el teclado del celular no se cierra.
+  const viejo = m.querySelector('.chats');
+  if (viejo && viejo.dataset.chat === (c ? c.k : '')) {
+    const tmp = document.createElement('div'); tmp.innerHTML = html;
+    const f1 = m.querySelector('.cfoot'), f2 = tmp.querySelector('.cfoot');
+    if ((f1?.dataset.abierta || '') === (f2?.dataset.abierta || '')) {
+      for (const sel of ['.ltit', '.wachips', '.citems', '.chead', '.cdatos', '.cbody', '#preslot']) {
+        const x1 = m.querySelector(sel), x2 = tmp.querySelector(sel);
+        if (!x1 || !x2) continue;
+        if (x1.innerHTML === x2.innerHTML) continue;
+        if (sel === '.cbody') {
+          const abajo = x1.scrollHeight - x1.scrollTop - x1.clientHeight < 90, arriba = x1.scrollTop;
+          x1.innerHTML = x2.innerHTML; x1.scrollTop = abajo ? x1.scrollHeight : arriba;
+        } else x1.innerHTML = x2.innerHTML;
+      }
+      document.body.classList.toggle('chat-abierto', !!c);
+      return;
+    }
+  }
+  m.innerHTML = html;
   const b = $('.cbody'); if (b) b.scrollTop = b.scrollHeight;
   const t = $('#resp'); if (t && BORRADOR[CHAT]) { t.value = BORRADOR[CHAT]; autoAlto(t); }
   document.body.classList.toggle('chat-abierto', !!c);
   armarMic();
+  if (c) cargarMedios(c.k);
 }
 
 /* ¿De qué publicidad llegó? Nombre del anuncio, del conjunto (= producto) y de la campaña.
@@ -1203,7 +1286,23 @@ function notaVoz(id, dir) {
     <span class="ntiempo">${activa ? mmss(AUD.el.currentTime) + ' / ' + mmss(AUD.el.duration) : '🎤'}</span>
     <button class="nvel" onclick="cambiarVel()">${AUD.vel}x</button></div>`;
 }
-function srcNota(id) { const m = D.convs?.[CHAT]?.mensajes?.[id]; return m?.archivoDataUrl || m?.fotoDataUrl || null; }
+function srcNota(id) { const m = D.convs?.[CHAT]?.mensajes?.[id]; return m ? srcDe({ ...m, id }) : null; }
+/* Archivos de los chats: viven aparte en medios/{chat}/{mensaje} y se bajan solo al abrir el chat */
+const MEDIOS = {}, BAJANDO = new Set();
+function srcDe(x) { return x.archivoDataUrl || x.fotoDataUrl || MEDIOS[CHAT + '/' + x.id] || null; }
+async function cargarMedios(k) {
+  const ms = msgsDe(D.convs[k] || {}).filter((x) => x.medio && !MEDIOS[k + '/' + x.id] && !BAJANDO.has(k + '/' + x.id)).slice(-40).reverse();
+  let pend = 0;
+  const uno = async (x) => {
+    const clave = k + '/' + x.id; BAJANDO.add(clave);
+    try { const v = (await db.ref(`${R}/medios/${k}/${x.id}`).once('value')).val(); if (v?.d) MEDIOS[clave] = v.d; }
+    catch (e) { console.warn('medio', clave, e.message); }
+    BAJANDO.delete(clave);
+    if (CHAT === k && !(pend++ % 3)) renderChats();
+  };
+  for (let i = 0; i < ms.length; i += 4) await Promise.all(ms.slice(i, i + 4).map(uno));
+  if (CHAT === k) renderChats();
+}
 function tocarNota(id) {
   if (AUD.id === id) { AUD.el.paused ? AUD.el.play() : AUD.el.pause(); return pintarNotas(); }
   const src = srcNota(id); if (!src) return toast('Esta nota todavía no se ha descargado');
@@ -1231,7 +1330,9 @@ function pintarNotas() {
   else pintarNotas();
 }));
 function cuerpoMsg(x) {
-  const arch = x.fotoDataUrl || x.archivoDataUrl;
+  const arch = srcDe(x);
+  if (x.fotoDataUrl && !x.tipo) x = { ...x, tipo: 'image' };
+  if (x.medio && !arch) return `<div class="medcarga">${{ image: '📷', audio: '🎤', video: '🎬', document: '📄', sticker: '🙂' }[x.tipo] || '📎'} Cargando…</div>${x.texto ? esc(x.texto) : ''}`;
   return x.tipo === 'image' && arch ? `<img src="${arch}" alt="">${esc(x.texto || '')}` :
     x.tipo === 'audio' && arch ? notaVoz(x.id, x.direccion) :
     x.tipo === 'video' && !arch && x.direccion === 'out' ? `🎬 Video${x.estadoEnvio === 'pendiente' ? ' · subiendo…' : ''}${x.texto ? '<br>' + esc(x.texto) : ''}` :
@@ -1288,10 +1389,10 @@ function vistaChat(c) {
   </div>
   ${campos.length ? `<div class="cdatos">${campos.map(([k, v]) => `<div><b>${k}</b>${esc(v)}</div>`).join('')}</div>` : ''}
   <div class="cbody">${burbujas}</div>
-  ${RESP && RESP.k === c.k ? `<div class="respbar"><div class="cita" style="flex:1;margin:0">↩ ${esc(RESP.texto)}</div><button class="wabtn" onclick="RESP=null;renderChats()">✕</button></div>` : ''}
+  <div id="preslot">${RESP && RESP.k === c.k ? `<div class="respbar"><div class="cita" style="flex:1;margin:0">↩ ${esc(RESP.texto)}</div><button class="wabtn" onclick="RESP=null;renderChats()">✕</button></div>` : ''}
   <div id="rrpop"></div>
-  ${abierta ? bandejaHTML() : ''}
-  <div class="cfoot">${abierta
+  ${abierta ? bandejaHTML() : ''}</div>
+  <div class="cfoot" data-abierta="${abierta ? 1 : 0}">${abierta
     ? `<input type="file" id="adj" class="hide" multiple accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,audio/*" onchange="adjuntar([...this.files]);this.value=''">
        <button class="wabtn" title="Respuestas rápidas ( / )" onclick="RR&&!RR.slash?cerrarRR():abrirRR('')">⚡</button>
        <button class="wabtn" title="Fotos, videos o archivos (hasta 10)" onclick="$('#adj').click()">📎</button>
@@ -1648,6 +1749,102 @@ function enviarSubir() {
 
 /* ---------------------------------------------------------------- inicio */
 // El arranque lo hace onAuthStateChanged cuando hay sesión.
+
+
+/* ---------- Conexión: aviso si se cae y reintento si tarda en cargar ---------- */
+let LENTO = false;
+setTimeout(() => { if (D.convs == null) { LENTO = true; if (TAB === 'chats') renderChats(); } }, 12000);
+db.ref('.info/connected').on('value', (s) => {
+  const ok = s.val() === true;
+  document.body.classList.toggle('sinred', !ok && !!CU);
+  let b = $('#avisoRed');
+  if (!ok && CU) {
+    if (!b) { b = document.createElement('div'); b.id = 'avisoRed'; document.body.appendChild(b); }
+    b.textContent = '📶 Sin conexión · reconectando… lo que escribas se envía al volver la señal';
+  } else if (b) b.remove();
+});
+
+/* ---------- Etiquetas y recordatorios por chat (mantener presionado en la lista) ---------- */
+const ETIQ_BASE = [
+  { id: 'interesado', nombre: '🔥 Interesado', color: '#f59e0b' }, { id: 'precio', nombre: '💲 Pidió precio', color: '#3b82f6' },
+  { id: 'pago', nombre: '💳 Espera pago', color: '#8b5cf6' }, { id: 'volver', nombre: '🔁 Volver a escribir', color: '#ef4444' },
+  { id: 'frecuente', nombre: '⭐ Cliente frecuente', color: '#10b981' }, { id: 'mayorista', nombre: '📦 Mayorista', color: '#14b8a6' },
+];
+function listaEtiquetas() {
+  const extra = Object.entries(D.etiquetas || {}).map(([id, e]) => ({ id, ...e })).filter((e) => e.nombre);
+  return [...ETIQ_BASE.filter((b) => !(D.etiquetas || {})[b.id]?.oculta), ...extra.filter((e) => !ETIQ_BASE.some((b) => b.id === e.id))];
+}
+function etiquetasHTML(x) {
+  return listaEtiquetas().filter((e) => x.etiquetas?.[e.id]).map((e) => `<span class="badge et" style="--c:${e.color || '#64748b'}">${esc(e.nombre)}</span>`).join('');
+}
+function cuandoTxt(at) {
+  const d = new Date(at), hoy = fechaCo(new Date()), dia = fechaCo(d), man = fechaCo(new Date(Date.now() + 86400000));
+  const h = d.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Bogota' });
+  return dia === hoy ? 'hoy ' + h : dia === man ? 'mañana ' + h : d.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'America/Bogota' }) + ' ' + h;
+}
+function recordatorioHTML(x) {
+  const r = x.recordatorio; if (!r?.at) return '';
+  const vencido = r.at <= Date.now();
+  return `<span class="badge ${vencido ? 'rv' : 'rc'}" title="${esc(r.nota || '')}">⏰ ${vencido ? 'Escribirle ya' : cuandoTxt(r.at)}</span>`;
+}
+const PRESION = { t: null, hecho: false };
+function presionar(e, k) {
+  PRESION.hecho = false; clearTimeout(PRESION.t);
+  PRESION.x = e.clientX; PRESION.y = e.clientY;
+  PRESION.t = setTimeout(() => { PRESION.hecho = true; navigator.vibrate?.(30); menuChat(k); setTimeout(() => (PRESION.hecho = false), 600); }, 550);
+}
+function soltarPresion() { clearTimeout(PRESION.t); }
+addEventListener('pointermove', (e) => { if (PRESION.t && (Math.abs(e.clientX - PRESION.x) > 10 || Math.abs(e.clientY - PRESION.y) > 10)) clearTimeout(PRESION.t); }, { passive: true });
+let MENU = null;
+function menuChat(k) {
+  const c = D.convs[k]; if (!c) return;
+  MENU = { k, nota: c.recordatorio?.nota || '' };
+  pintarMenu();
+}
+function cerrarMenu() { MENU = null; $('#menuChat')?.remove(); }
+function pintarMenu() {
+  if (!MENU) return; const c = D.convs[MENU.k] || {}, r = c.recordatorio;
+  let el = $('#menuChat'); if (!el) { el = document.createElement('div'); el.id = 'menuChat'; document.body.appendChild(el); }
+  const nom = c.datos?.nombre || c.nombre || '+' + MENU.k;
+  el.innerHTML = `<div class="hoja-fondo" onclick="cerrarMenu()"></div><div class="hoja">
+    <div class="hoja-t"><b>${esc(nom)}</b><button class="wabtn" onclick="cerrarMenu()">✕</button></div>
+    <div class="hoja-s">Etiquetas</div>
+    <div class="etqs">${listaEtiquetas().map((e) => `<button class="etq ${c.etiquetas?.[e.id] ? 'on' : ''}" style="--c:${e.color || '#64748b'}" onclick="togEtiqueta('${MENU.k}','${e.id}')">${esc(e.nombre)}</button>`).join('')}
+      ${esAdmin() ? '<button class="etq mas" onclick="nuevaEtiqueta()">＋ Nueva</button>' : ''}</div>
+    <div class="hoja-s">⏰ Recordarme escribirle ${r?.at ? `<span class="note">· ${r.at <= Date.now() ? 'vencido' : cuandoTxt(r.at)}</span>` : ''}</div>
+    <div class="recs">${[['1 h', 1], ['3 h', 3], ['Mañana 9 am', 'm9'], ['2 días', 48], ['3 días', 72], ['1 semana', 168]].map(([t, v]) => `<button class="etq" onclick="ponerRecordatorio('${v}')">${t}</button>`).join('')}</div>
+    <div class="row" style="gap:6px;margin-top:8px;flex-wrap:nowrap">
+      <input id="recD" type="number" min="0" inputmode="numeric" placeholder="Días" style="width:72px"><input id="recH" type="number" min="0" inputmode="numeric" placeholder="Horas" style="width:72px">
+      <button class="btn sm pri" onclick="ponerRecordatorio('custom')">Programar</button></div>
+    <input id="recN" placeholder="Nota (opcional): ej. confirmar talla" value="${esc(MENU.nota)}" oninput="MENU.nota=this.value" style="margin-top:8px">
+    ${r?.at ? `<button class="btn sm ghost" style="margin-top:8px" onclick="quitarRecordatorio()">Quitar recordatorio</button>` : ''}
+    <div class="row" style="margin-top:12px"><button class="btn" style="flex:1" onclick="const k=MENU.k;cerrarMenu();abrirChat(k)">Abrir chat</button>
+      ${c.noLeidos ? '' : `<button class="btn" style="flex:1" onclick="db.ref('${R}/conversaciones/${MENU.k}/noLeidos').set(1);cerrarMenu()">Marcar no leído</button>`}</div>
+  </div>`;
+}
+function togEtiqueta(k, id) {
+  const on = !D.convs[k]?.etiquetas?.[id];
+  db.ref(`${R}/conversaciones/${k}/etiquetas/${id}`).set(on || null).then(() => pintarMenu()).catch((e) => toast('No se pudo: ' + e.message));
+}
+function nuevaEtiqueta() {
+  const n = prompt('Nombre de la etiqueta (puedes iniciar con un emoji):'); if (!n || !n.trim()) return;
+  const colores = ['#f97316', '#06b6d4', '#a855f7', '#22c55e', '#e11d48', '#eab308'];
+  db.ref(`${R}/config/etiquetas`).push({ nombre: n.trim().slice(0, 30), color: colores[Math.floor(Math.random() * colores.length)] }).then(() => setTimeout(pintarMenu, 300));
+}
+function ponerRecordatorio(v) {
+  if (!MENU) return;
+  let at;
+  if (v === 'm9') { const d = new Date(Date.now() + 86400000); const f = fechaCo(d); at = new Date(f + 'T09:00:00-05:00').getTime(); }
+  else if (v === 'custom') { const dd = Number($('#recD').value) || 0, hh = Number($('#recH').value) || 0; if (!dd && !hh) return toast('Pon días u horas'); at = Date.now() + (dd * 24 + hh) * 3600000; }
+  else at = Date.now() + Number(v) * 3600000;
+  const k = MENU.k;
+  db.ref(`${R}/conversaciones/${k}`).update({ recordatorio: { at, nota: (MENU.nota || '').trim() || null, porId: CU.id, porNombre: CU.nombre, creadoAt: Date.now() }, recordatorioAt: at })
+    .then(() => { toast('⏰ Te aviso ' + cuandoTxt(at)); cerrarMenu(); }).catch((e) => toast('No se pudo: ' + e.message));
+}
+function quitarRecordatorio() {
+  const k = MENU.k;
+  db.ref(`${R}/conversaciones/${k}`).update({ recordatorio: null, recordatorioAt: null }).then(() => { toast('Recordatorio quitado'); cerrarMenu(); });
+}
 
 /* ---------- Notificaciones (Web Push). En iPhone solo funcionan con la app agregada a la pantalla de inicio. ---------- */
 

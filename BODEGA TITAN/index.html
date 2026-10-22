@@ -104,9 +104,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 /* ── STATS ── */
 .stats-row{display:grid;gap:14px;margin-bottom:18px}
+.ap-filtros-btn{display:none!important}
+@media(max-width:800px){
+  .ap-filtros-btn{display:inline-flex!important}
+  #ap-filtros:not(.abierto)>*:not(.ap-filtros-btn):not(.ap-siempre):not(#btn-guias-masivas){display:none!important}
+  #ap-filtros .ap-siempre{flex:1;min-width:160px}
+}
+.ap-plegable{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px}
+.ap-plegable>summary{cursor:pointer;font-size:13px;font-weight:600;list-style:none;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ap-plegable>summary::-webkit-details-marker{display:none}
+.ap-plegable-ver{margin-left:auto;color:var(--primary);font-size:12px}
+.ap-plegable[open]>summary{margin-bottom:10px}
+.ap-plegable[open] .ap-plegable-ver{font-size:0}.ap-plegable[open] .ap-plegable-ver:after{content:'ocultar';font-size:12px}
+
 .stats-4{grid-template-columns:repeat(4,1fr)}
 .stats-5{grid-template-columns:repeat(5,1fr)}
-.stats-6{grid-template-columns:repeat(6,1fr)}
+.stats-6{grid-template-columns:repeat(3,1fr)}
 .stats-2{grid-template-columns:repeat(2,1fr)}
 .stat-card{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:14px}
 .stat-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:8px}
@@ -443,6 +456,7 @@ textarea{resize:vertical}
         <div class="stat-card" style="border-left:4px solid var(--warning)"><div class="stat-label">Valor Inventario — Costo</div><div class="stat-value text-warning" id="s-val-costo">$0</div><div class="stat-sub">Stock × precio costo</div></div>
         <div class="stat-card" style="border-left:4px solid var(--success)"><div class="stat-label">Valor Inventario — Venta</div><div class="stat-value text-success" id="s-val-venta">$0</div><div class="stat-sub">Stock × precio venta</div></div>
       </div>
+      <div id="dash-envios" class="mb-16"></div>
       <!-- DASHBOARD VENDEDOR -->
       <div id="dash-vendor-stats" style="display:none"></div>
       <div class="card mb-20" id="dash-chart-card">
@@ -996,7 +1010,8 @@ textarea{resize:vertical}
     <div class="page" id="page-admin-pedidos">
       <div class="section-header">
         <div class="section-title"><i class="bi bi-card-list" style="color:var(--primary)"></i> Todos los Pedidos</div>
-        <div class="flex" style="flex-wrap:wrap;gap:6px;align-items:center">
+        <div class="flex" id="ap-filtros" style="flex-wrap:wrap;gap:6px;align-items:center">
+          <button type="button" class="btn btn-outline btn-sm ap-filtros-btn" onclick="document.getElementById('ap-filtros').classList.toggle('abierto')"><i class="bi bi-funnel-fill"></i> Filtros <i class="bi bi-chevron-down"></i></button>
           <select id="filter-admin-pedidos" onchange="renderAdminPedidos()" title="Filtrar por estado" style="width:auto;font-size:13px;padding:6px 9px;border:1px solid var(--border);border-radius:8px">
             <option value="">Estado</option>
             <option value="pendiente">Pendiente</option>
@@ -1038,7 +1053,7 @@ textarea{resize:vertical}
               <button class="btn btn-sm btn-outline" onclick="limpiarFiltroFecha()" title="Limpiar filtro" style="width:100%;justify-content:center"><i class="bi bi-x-circle"></i> Limpiar</button>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:4px 10px">
+          <div class="ap-siempre" style="display:flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:4px 10px">
             <i class="bi bi-search" style="color:var(--muted);font-size:13px"></i>
             <input type="text" id="filter-admin-buscar" placeholder="Cliente o teléfono…" oninput="renderAdminPedidos()" style="border:none;background:transparent;font-size:13px;padding:3px 4px;width:160px;outline:none">
             <button class="btn-icon" onclick="document.getElementById('filter-admin-buscar').value='';renderAdminPedidos()" title="Limpiar búsqueda" style="padding:2px 4px"><i class="bi bi-x-lg" style="font-size:11px"></i></button>
@@ -2977,6 +2992,7 @@ function renderDashboard() {
   // Elementos solo admin
   document.getElementById('dash-admin-stats').style.display=isVend?'none':'grid';
   document.getElementById('dash-admin-valores').style.display=isVend?'none':'grid';
+  const deEl=document.getElementById('dash-envios'); if(deEl){ deEl.style.display=isVend?'none':'block'; if(!isVend) renderDashEnvios(); }
   document.getElementById('dash-chart-card').style.display=isVend?'none':'block';
   document.getElementById('dash-bodega-chart-card').style.display=isVend?'none':'block';
   document.getElementById('dash-admin-inventario').style.display=isVend?'none':'grid';
@@ -3110,6 +3126,70 @@ function verProveedorDashboard(prov){
   if(s){s.value=prov;renderCompras();}
 }
 
+
+// ── Inicio (admin): estado de los envíos con conteo, valor y porcentaje ──
+// Usa el mismo estado que ve la tabla de pedidos (estadoEfectivo / estadoGuiaUI),
+// así los números salen de la realidad del rastreo, sin flujos aparte.
+let _envRango=(()=>{try{return localStorage.getItem('dash_env_rango')||'todo'}catch(e){return 'todo'}})();
+function setEnvRango(r){ _envRango=r; try{localStorage.setItem('dash_env_rango',r)}catch(e){} renderDashEnvios(); }
+function renderDashEnvios(){
+  const el=document.getElementById('dash-envios'); if(!el) return;
+  const hoyY=hoy(), d=new Date();
+  const ymd=(x)=>x.toLocaleDateString('en-CA',{timeZone:'America/Bogota'});
+  let desde=null;
+  if(_envRango==='hoy') desde=hoyY;
+  else if(_envRango==='7'){ const x=new Date(); x.setDate(x.getDate()-6); desde=ymd(x); }
+  else if(_envRango==='30'){ const x=new Date(); x.setDate(x.getDate()-29); desde=ymd(x); }
+  else if(_envRango==='mes') desde=hoyY.slice(0,7)+'-01';
+  const peds=getPedidos().filter(p=>p && p.tipoVenta!=='cambio' && (!desde || (p.fecha||'')>=desde));
+  const guiaPor=new Map(); getGuias().forEach(g=>{ if(g.pedidoId && !guiaPor.has(g.pedidoId)) guiaPor.set(g.pedidoId,g); });
+  const val=(p)=>Number(p.precioVenta)||0;
+  const G={envios:[],dist:[],novedad:[],oficina:[],entregados:[],devueltos:[],cancelados:[]};
+  peds.forEach(p=>{
+    const ef=estadoEfectivo(p);
+    if(ef==='cancelado'){ G.cancelados.push(p); return; }
+    const g=guiaPor.get(p.id);
+    if(!g) return;
+    G.envios.push(p);
+    const eu=estadoGuiaUI(g);
+    if(ef==='entregado') G.entregados.push(p);
+    else if(ef==='en_devolucion') G.devueltos.push(p);
+    else if(eu==='en_oficina') G.oficina.push(p);
+    else { G.dist.push(p); if(eu==='novedad') G.novedad.push(p); }
+  });
+  const sum=(l)=>l.reduce((s,p)=>s+val(p),0);
+  const nEnv=G.envios.length, vEnv=sum(G.envios);
+  const pct=(n,b)=>b?((n/b)*100).toFixed(1)+'%':'0%';
+  const entHoy=G.entregados.filter(p=>p.tsEstado && ymd(new Date(p.tsEstado))===hoyY).length;
+  const tarjeta=(color,icono,titulo,lista,sub)=>`<div class="stat-card" style="border-left:4px solid ${color}">
+      <div class="stat-label"><i class="bi ${icono}" style="color:${color}"></i> ${titulo}</div>
+      <div class="stat-value" style="color:${color}">${fmtN(lista.length)}</div>
+      <div class="stat-sub">${fmtM(sum(lista))} · <b>${sub}</b></div></div>`;
+  const chips=[['todo','Todo'],['hoy','Hoy'],['7','7 días'],['30','30 días'],['mes','Este mes']]
+    .map(([k,t])=>`<button class="btn btn-sm ${_envRango===k?'btn-primary':'btn-outline'}" onclick="setEnvRango('${k}')">${t}</button>`).join('');
+  el.innerHTML=`<div class="flex-between mb-8" style="flex-wrap:wrap;gap:8px">
+      <div><div class="card-title"><i class="bi bi-truck" style="color:var(--primary)"></i> Envíos</div><div class="card-sub">Según la fecha del pedido · valores de venta · porcentaje sobre los envíos</div></div>
+      <div class="flex" style="gap:6px;flex-wrap:wrap">${chips}</div></div>
+    <div class="stats-row stats-6">
+      ${tarjeta('#6366f1','bi-box-seam-fill','Total envíos',G.envios,'100% · '+fmtN(peds.length)+' pedidos')}
+      ${tarjeta('#3b82f6','bi-truck','En distribución',G.dist,pct(G.dist.length,nEnv)+(G.novedad.length?' · '+G.novedad.length+' con novedad':''))}
+      ${tarjeta('#0ea5e9','bi-shop','En oficina',G.oficina,pct(G.oficina.length,nEnv)+' · para reclamar')}
+      ${tarjeta('#059669','bi-check-circle-fill','Entregados',G.entregados,pct(G.entregados.length,nEnv)+' · hoy: '+entHoy)}
+      ${tarjeta('#dc2626','bi-arrow-return-left','Devueltos',G.devueltos,pct(G.devueltos.length,nEnv))}
+      ${tarjeta('#64748b','bi-x-circle-fill','Cancelados',G.cancelados,pct(G.cancelados.length,peds.length)+' de los pedidos')}
+    </div>`;
+}
+
+// Saludo del vendedor: "Bienvenida Carolina" / "Bienvenido Gio"
+function saludoVendedor(){
+  const nombre=String(CU?.nombre||'').trim().split(/\s+/)[0]||'';
+  const n=nombre.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const fem=['DEICY','MARLEY','YIRLEY','LEIDY','BEATRIZ','ISABEL','RUTH','MARY','NANCY','LUZ','SANDRA','YULY','KELLY','SHIRLEY','ESTHER','INES','ABIGAIL'];
+  const masc=['GIO','KEVIN','JOSE','LUIS','JUAN','CARLOS','ANDRES','JORGE','MATEO','LUCA','JOSUE','ELIAS'];
+  const g=CU?.genero||(masc.includes(n)?'m':(fem.includes(n)||/A$/.test(n))?'f':'m');
+  const cap=nombre?nombre.charAt(0).toUpperCase()+nombre.slice(1).toLowerCase():'';
+  return `${g==='f'?'Bienvenida':'Bienvenido'}${cap?' '+cap:''}`;
+}
 function renderVendorDashboard(){
   const misPeds=getPedidos().filter(esMiPedido);
   const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-7);
@@ -3129,6 +3209,10 @@ function renderVendorDashboard(){
   const topModelos=Object.entries(modelMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const el=document.getElementById('dash-vendor-stats');
   el.innerHTML=`
+    <div class="card mb-12" style="background:linear-gradient(135deg,#1e1b4b,#4338ca);color:#fff;border:none">
+      <div style="font-size:22px;font-weight:800">👋 ${saludoVendedor()}</div>
+      <div style="font-size:13px;opacity:.85;margin-top:2px">Así van tus pedidos. ¡A cerrar ventas hoy! 💪</div>
+    </div>
     <div class="stats-row stats-4 mb-12">
       <div class="stat-card"><div class="stat-icon" style="background:#ede9fe;color:#6366f1"><i class="bi bi-cart-fill"></i></div><div class="stat-label">Pedidos — últimos 7 días</div><div class="stat-value">${ultimos7.length}</div><div class="stat-sub">Total registrados</div></div>
       <div class="stat-card"><div class="stat-icon" style="background:#fef3c7;color:#f59e0b"><i class="bi bi-hourglass-split"></i></div><div class="stat-label">Pendientes</div><div class="stat-value text-warning">${pendientes}</div><div class="stat-sub">Esperando aprobación</div></div>
@@ -7589,7 +7673,10 @@ function renderAdminPedidos(){
   if(btnGuias) btnGuias.style.display=pedidos.length?'inline-flex':'none';
   const el=document.getElementById('admin-pedidos-content');
   const _vD=_filtroYmd(filtroFechaDesde), _vH=_filtroYmd(filtroFechaHasta);
-  const resumenHtml=`<div class="flex mb-8" style="gap:6px;align-items:center;flex-wrap:wrap">
+  const _resAbierto=(()=>{try{return localStorage.getItem('ap_resumen_abierto')==='1'}catch(e){return false}})();
+  const resumenHtml=`<details class="ap-plegable mb-12" ${_resAbierto?'open':''} ontoggle="try{localStorage.setItem('ap_resumen_abierto',this.open?'1':'0')}catch(e){}">
+    <summary><i class="bi bi-bar-chart-fill" style="color:var(--primary)"></i> Resumen: ${fmtN(nExitosos)} entregados · ${fmtN(nDevol)} devoluciones · ${pctDevol.toFixed(1)}% devolución <span class="ap-plegable-ver">ver</span></summary>
+    <div class="flex mb-8" style="gap:6px;align-items:center;flex-wrap:wrap">
       <span style="font-size:12px;font-weight:600;color:var(--muted)"><i class="bi bi-calendar-range"></i> Resumen por fecha:</span>
       <input type="date" id="ap-res-desde" value="${_vD}" onchange="setResumenFecha()" style="width:auto;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
       <span style="font-size:12px;color:var(--muted)">→</span>
@@ -7603,7 +7690,7 @@ function renderAdminPedidos(){
       <div class="stat-card" style="border-left:4px solid #059669"><div class="stat-label">Pedidos exitosos (entregados)</div><div class="stat-value" style="color:#059669">${fmtN(nExitosos)}</div><div class="stat-sub">${fmtM(valExitosos)} · ${rotuloRango||'todo el historial'}</div></div>
       <div class="stat-card" style="border-left:4px solid #dc2626"><div class="stat-label">Devoluciones</div><div class="stat-value" style="color:#dc2626">${fmtN(nDevol)}</div><div class="stat-sub">${rotuloRango||'todo el historial'}</div></div>
       <div class="stat-card" style="border-left:4px solid #6366f1"><div class="stat-label">% devolución</div><div class="stat-value" style="color:#6366f1">${pctDevol.toFixed(1)}%</div><div class="stat-sub">sobre ${fmtN(nResumenTotal)} pedidos no cancelados</div></div>
-    </div>`;
+    </div></details>`;
   if(!pedidos.length){el.innerHTML=resumenHtml+`<div class="card"><div class="empty"><div class="empty-icon"><i class="bi bi-bag-x" style="font-size:38px;color:var(--muted)"></i></div><h3>${_soloBackorder?'No hay pedidos por reponer 🎉':(filtroEstado||filtroVend||filtroPago||rotuloRango?'Sin pedidos con esos filtros'+(rotuloRango?' ('+rotuloRango+')':''):'No hay pedidos registrados')}</h3></div></div>`;return;}
   const banner=rotuloRango
       ? `<div class="card mb-16" style="background:linear-gradient(135deg,#e0e7ff,#ede9fe);border:1px solid #c7d2fe;display:flex;align-items:center;justify-content:space-between;padding:12px 16px">
