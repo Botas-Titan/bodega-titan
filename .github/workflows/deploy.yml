@@ -42,7 +42,11 @@ jobs:
           echo "Version publicada: $VER  ($FILE)"
 
       # --- Destino principal: Firebase Hosting (sitio bodega-titan-app) ---
+      # continue-on-error: si Firebase falla (p.ej. permisos del service
+      # account), NO se bloquea la publicacion en GitHub Pages, que es el
+      # sitio que usan los vendedores (bodegatitan.com).
       - name: Desplegar a Firebase Hosting
+        continue-on-error: true
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
