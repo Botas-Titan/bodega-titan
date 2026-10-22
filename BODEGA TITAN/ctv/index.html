@@ -540,7 +540,9 @@ function suscribir() {
   db.ref(`${R}/config/etiquetas`).on('value', (s) => { D.etiquetas = s.val() || {}; if (TAB === 'chats') renderChats(); if (MENU) pintarMenu(); });
   if (esAdmin()) db.ref(`${R}/config/ctv/mediosMigrados`).once('value').then((s) => {
     // Una sola vez: pasar los archivos viejos fuera de los mensajes para que el CTV cargue rápido
-    if (!s.val() && !store.get('ctv_migrar_pedido')) { store.set('ctv_migrar_pedido', Date.now()); db.ref(`${R}/ctv/migrarMedios`).push({ por: CU.nombre, at: Date.now() }); }
+    // Se repite cada hora mientras no conste que terminó (por si la función aún no estaba publicada)
+    if (!s.val() && Date.now() - (Number(store.get('ctv_migrar_pedido')) || 0) > 3600000)
+      db.ref(`${R}/ctv/migrarMedios`).push({ por: CU.nombre, at: Date.now() }).then(() => store.set('ctv_migrar_pedido', Date.now())).catch(() => {});
   }).catch(() => {});
   db.ref(`${R}/publicidad/anuncios`).on('value', (s) => { D.anuncios = s.val() || {}; if (TAB === 'chats') renderChats(); if (TAB === 'reparto' && !REP_EDIT) renderReparto(); });
   db.ref(`${R}/config/respuestasRapidas`).on('value', (s) => { D.rr = s.val() || {}; if (TAB === 'kb' && !KB_EDIT) renderKB(); });
