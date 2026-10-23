@@ -11072,7 +11072,15 @@ function bootApp() {
       })
       .catch(function(e){
         console.error('[ACCESO]', e);
-        mostrarLogin('No se pudo verificar tu acceso. Revisa tu conexión e intenta de nuevo.');
+        // Si la base niega el permiso con una sesión guardada, casi siempre es una sesión vieja
+        // (contraseña cambiada o cuenta recreada): se cierra para que entre de nuevo limpio.
+        const codigo = (e && (e.code || e.message)) || 'desconocido';
+        if (String(codigo).toUpperCase().indexOf('PERMISSION') !== -1) {
+          return firebase.auth().signOut().finally(function(){
+            mostrarLogin('Tu sesión venció. Vuelve a entrar con tu correo y contraseña. (' + codigo + ')');
+          });
+        }
+        mostrarLogin('No se pudo verificar tu acceso. Revisa tu conexión e intenta de nuevo. (' + codigo + ')');
       });
   });
 }
