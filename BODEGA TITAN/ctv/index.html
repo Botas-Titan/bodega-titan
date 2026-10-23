@@ -11,6 +11,7 @@
 <meta name="theme-color" content="#0f1115">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -213,7 +214,7 @@ svg text{fill:var(--muted);font-size:10px;font-family:Inter,sans-serif}
 .buscar{display:flex;align-items:center;gap:8px;background:#202c33;border-radius:10px;padding:0 12px;margin:10px 0 8px;color:var(--wa-sub)}
 .buscar input{background:transparent;border:none;padding:9px 0;color:var(--wa-txt);font-size:15px}
 .buscar input:focus{border:none}
-.wachips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+.wachips{display:flex;flex-wrap:wrap;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
 .wachips::-webkit-scrollbar{display:none}
 .wachips button{flex:none;background:transparent;border:1px solid #2f3b43;color:var(--wa-sub);border-radius:99px;padding:6px 14px;font-size:14px;font-weight:500;cursor:pointer}
 .wachips button.on{background:#0a332c;border-color:#0a332c;color:#d9fdd3}
@@ -245,6 +246,7 @@ svg text{fill:var(--muted);font-size:10px;font-family:Inter,sans-serif}
   .ltit{font-size:34px;font-weight:800;flex-direction:column;gap:0;padding-top:6px}
   .ltit small{font-size:13px}
   .buscar{background:#1c1c1e;border-radius:12px}
+  .wachips{flex-wrap:nowrap}
   .wachips button{background:#1c1c1e;border:none;color:#aeaeb2;font-size:15px;padding:8px 15px}
   .wachips button.on{background:#3a3a3c;color:#fff}
   .citem{grid-template-columns:58px 1fr;gap:12px;padding:10px 16px 0;border:none;align-items:start}
@@ -334,6 +336,46 @@ svg text{fill:var(--muted);font-size:10px;font-family:Inter,sans-serif}
   .kpi .v{font-size:20px}
   .editor-top{grid-template-columns:1fr}
   .who{display:none}
+}
+
+/* ════════════ PIEL TITÁN — solo estética, no toca estructura ════════════
+   Para volver al aspecto anterior: borrar este bloque completo.          */
+:root{
+  /* panel general */
+  --bg:#0e0f0d; --panel:#181a17; --panel2:#1f221e; --line:#282c26;
+  --txt:#eef1ea; --muted:#9ba397;
+  --acc:#3fbe86; --acc2:#5fd3a0; --ok:#3fbe86; --warn:#d4c24a; --bad:#ea6a52;
+  --blue:#7fb5e8; --green:#3fbe86;
+  --r:18px;
+  /* chats */
+  --wa-bg:#121410; --wa-panel:#181a17; --wa-head:#1f221e; --wa-in:#1f221e;
+  --wa-out:#1d5e44; --wa-txt:#eef1ea; --wa-sub:#9ba397; --wa-verde:#3fbe86;
+  --wa-azul:#7fb5e8; --wa-linea:#282c26; --wa-hover:#1f221e; --wa-sel:#24291f;
+  /* propias de la piel */
+  --cuero:#e0a155;
+  --titulo:"Bricolage Grotesque","Barlow",system-ui,sans-serif;
+  --sombra:0 1px 2px rgba(0,0,0,.4), 0 16px 34px -20px rgba(0,0,0,.8);
+  --muelle:cubic-bezier(.34,1.56,.64,1);
+}
+html,body{font-family:"Barlow",Inter,system-ui,sans-serif}
+.brand,h2,h3{font-family:var(--titulo);letter-spacing:-.015em}
+.brand{font-weight:800}
+.brand span{color:var(--acc)}
+.card{box-shadow:var(--sombra)}
+.btn{border-radius:99px;transition:transform .3s var(--muelle),border-color .2s linear,background .2s linear}
+.btn:hover{transform:translateY(-1px);border-color:#3a4036}
+.btn.pri{color:#06160e;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.btn.pri:hover{background:var(--acc2)}
+.chip{transition:transform .3s var(--muelle),background .2s linear}
+.chip.on{color:#06160e}
+input,select,textarea{border-radius:12px}
+header{background:rgba(14,15,13,.92)}
+.tab{font-family:var(--titulo);font-weight:700}
+.wachips button{transition:background .2s linear,border-color .2s linear}
+.citem{transition:background .18s linear}
+@media (prefers-reduced-motion:reduce){
+  .btn,.chip,.citem{transition:none}
+  .btn:hover{transform:none}
 }
 </style>
 </head>
@@ -1181,8 +1223,14 @@ function renderChats() {
   if (D.convs == null) { m.innerHTML = `<div class="empty">Cargando chats…${LENTO ? '<br><br>La conexión está lenta. <button class="btn sm" onclick="location.reload()">Reintentar</button>' : ''}</div>`; return; }
   let lista = listaChats();
   if (CBUS.trim()) { const q = CBUS.trim().toLowerCase(); lista = lista.filter((c) => (c.k + ' ' + (c.datos?.nombre || '') + ' ' + (c.nombre || '')).toLowerCase().includes(q)); }
+  const archiva = idsQueArchivan();
+  const verArchivados = CFILT.startsWith('et:') && archiva.includes(CFILT.slice(3));
+  const nGuias = lista.filter(soloAvisoGuia).length;
+  if (CFILT !== 'guias' && !CBUS.trim()) lista = lista.filter((c) => !soloAvisoGuia(c));
+  if (CFILT === 'guias') lista = lista.filter(soloAvisoGuia);
+  if (archiva.length && !verArchivados && !CBUS.trim()) lista = lista.filter((c) => !archiva.some((id) => c.etiquetas?.[id]));
   const n = { todos: lista.length, noleidos: lista.filter((c) => c.noLeidos).length, ventas: lista.filter((c) => c.etapa === 'venta_cerrada' && !c.pedidoPasado && !c.pedidoId).length,
-    datos: lista.filter((c) => c.etapa === 'faltan_datos').length, pausa: lista.filter(pausado).length, recordar: lista.filter((c) => c.recordatorio?.at).length };
+    datos: lista.filter((c) => c.etapa === 'faltan_datos').length, pausa: lista.filter(pausado).length, recordar: lista.filter((c) => c.recordatorio?.at).length, guias: nGuias };
   if (CFILT === 'ventas') lista = lista.filter((c) => c.etapa === 'venta_cerrada' && !c.pedidoPasado && !c.pedidoId);
   if (CFILT === 'datos') lista = lista.filter((c) => c.etapa === 'faltan_datos');
   if (CFILT === 'pausa') lista = lista.filter(pausado);
@@ -1198,7 +1246,7 @@ function renderChats() {
         <div class="ltit">Chats <small>${esAdmin() ? '322 414 6909' : 'mis chats'}</small>${botonAvisos()}</div>
         <div class="buscar"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           <input id="cbus" placeholder="Buscar nombre o número" value="${esc(CBUS)}" oninput="CBUS=this.value;renderChats()"></div>
-        <div class="wachips">${[['todos', 'Todos', n.todos], ['noleidos', 'No leídos', n.noleidos], ['recordar', '⏰ Recordatorios', n.recordar], ['ventas', 'Ventas por pasar', n.ventas], ['datos', 'Pidiendo datos', n.datos], ['pausa', 'Con humano', n.pausa],
+        <div class="wachips">${[['todos', 'Todos', n.todos], ['noleidos', 'No leídos', n.noleidos], ['recordar', '⏰ Recordatorios', n.recordar], ['ventas', 'Ventas por pasar', n.ventas], ['datos', 'Pidiendo datos', n.datos], ['pausa', 'Con humano', n.pausa], ['guias', '📄 Avisos de guía', n.guias],
           ...listaEtiquetas().filter((e) => listaChats().some((c) => c.etiquetas?.[e.id])).map((e) => ['et:' + e.id, e.nombre, 0])]
           .map(([k, t, q]) => `<button class="${CFILT === k ? 'on' : ''}" onclick="CFILT='${k}';renderChats()">${t}${q && k !== 'todos' ? ' ' + q : ''}</button>`).join('')}</div>
       </div>
@@ -1789,6 +1837,15 @@ function listaEtiquetas() {
   const extra = Object.entries(D.etiquetas || {}).map(([id, e]) => ({ id, ...e })).filter((e) => e.nombre);
   return [...ETIQ_BASE.filter((b) => !(D.etiquetas || {})[b.id]?.oculta), ...extra.filter((e) => !ETIQ_BASE.some((b) => b.id === e.id))];
 }
+// Chats que solo existen porque se avisó la guía: la venta se habló por el
+// WhatsApp propio del vendedor, aquí nunca hubo conversación.
+function soloAvisoGuia(c) { return c.fuente === 'guia_vendedor'; }
+
+// Etiquetas que archivan: el chat sale de la lista y solo se ve entrando a su filtro.
+function normEt(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/gi, '').toLowerCase(); }
+function etArchiva(e) { return e.archiva === true || normEt(e.nombre) === 'basura'; }
+function idsQueArchivan() { return listaEtiquetas().filter(etArchiva).map((e) => e.id); }
+
 function etiquetasHTML(x) {
   return listaEtiquetas().filter((e) => x.etiquetas?.[e.id]).map((e) => `<span class="badge et" style="--c:${e.color || '#64748b'}">${esc(e.nombre)}</span>`).join('');
 }
