@@ -15,6 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <style>
 :root{
   --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --txt:#eef0f4; --muted:#9097a6;
@@ -424,9 +425,11 @@ firebase.initializeApp({
   authDomain: "bodegatitan-2d932.firebaseapp.com",
   databaseURL: "https://bodegatitan-2d932-default-rtdb.firebaseio.com",
   projectId: "bodegatitan-2d932",
+  storageBucket: "bodegatitan-2d932.firebasestorage.app",
   appId: "1:808673226711:web:7c92ca0bbbf2b8aafba592"
 });
 const db = firebase.database();
+const almacen = firebase.storage();
 const R = 'titanbotas';
 
 /* ---------------------------------------------------------------- utils */
@@ -527,6 +530,7 @@ const TABS = [
   { id: 'vend', t: 'Vendedores', c: 'Ventas', ic: SVG('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>') },
   { id: 'flujos', t: 'Flujos del bot', c: 'Flujos', ic: SVG('<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/><path d="M6.5 10v4a3 3 0 0 0 3 3H14"/>') },
   { id: 'kb', t: 'Conocimiento', c: 'Saber', ic: SVG('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14zM20 17v4H6.5"/>') },
+  { id: 'fotos', t: 'Fotos', c: 'Fotos', ic: SVG('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>') },
   { id: 'inv', t: 'Inventario del bot', c: 'Inventario', all: true, ic: SVG('<path d="M21 8 12 3 3 8v8l9 5 9-5V8zM3 8l9 5 9-5M12 13v8"/>') },
   { id: 'bodega', t: 'App de bodega ↗', c: 'Bodega', all: true, ic: SVG('<path d="M3 21V9l9-6 9 6v12M8 21v-7h8v7M8 17h8"/>') },
 ];
@@ -543,7 +547,7 @@ function noLeidosTot() {
 }
 function ir(id) { if (id === 'bodega') { location.href = BODEGA_URL; return; } TAB = id; store.set('ctv_tab', id); if (id !== 'chats') { CHAT = null; document.body.classList.remove('chat-abierto'); } pintarTabs(); render(); window.scrollTo(0, 0); }
 function render() {
-  ({ chats: renderChats, reparto: renderReparto, vend: renderVend, flujos: renderFlujos, kb: renderKB, inv: renderInv })[TAB]();
+  ({ chats: renderChats, reparto: renderReparto, vend: renderVend, flujos: renderFlujos, kb: renderKB, inv: renderInv, fotos: renderFotos })[TAB]();
 }
 
 function arrancar() {
@@ -1043,6 +1047,147 @@ function partirNombre(nombre) {
   return { modelo: tk.join(' ').trim(), color: color.join(' ') || 'único' };
 }
 let INV_Q = '';
+/* ===================================================================== */
+/* Fotos de producto (solo admin)                                        */
+/*                                                                       */
+/* La foto que guarda la app de bodega se reduce a 400 px: sirve para la  */
+/* lista, no para mandársela a un cliente. Aquí se suben las buenas, sin  */
+/* recomprimir, y Marcela las manda por dirección web.                   */
+/* ===================================================================== */
+
+let FOT_Q = '', FOT_SUBIENDO = {};
+
+/** "CAT 01 NEGRO" → "cat-01-negro" (misma fórmula que en el bot). */
+function claveFoto(nombre) {
+  return String(nombre || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function renderFotos() {
+  const m = $('#main');
+  if (!esAdmin()) { m.innerHTML = '<div class="empty">Solo el administrador.</div>'; return; }
+  if (D.productos == null) {
+    m.innerHTML = '<div class="empty">Leyendo la bodega…</div>';
+    db.ref(`${R}/productos`).on('value', (s) => { D.productos = s.val() || {}; if (TAB === 'fotos') renderFotos(); });
+    return;
+  }
+  if (D.fotosProd == null) {
+    m.innerHTML = '<div class="empty">Leyendo las fotos…</div>';
+    db.ref(`${R}/config/fotosProducto`).on('value', (s) => { D.fotosProd = s.val() || {}; if (TAB === 'fotos') renderFotos(); });
+    return;
+  }
+
+  // Un producto por color, que es como existen en la bodega
+  let lista = vals(D.productos).filter((p) => p && !p.oculto && vals(p.variantes).some((v) => Number(v?.stockActual) > 0))
+    .map((p) => ({ nombre: p.nombre, k: claveFoto(p.nombre) }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const total = lista.length;
+  const listos = lista.filter((p) => (D.fotosProd[p.k]?.fotos || []).length).length;
+  if (FOT_Q) lista = lista.filter((p) => norm(p.nombre).includes(norm(FOT_Q)));
+
+  m.innerHTML = `
+  <div class="row" style="justify-content:space-between"><h2>Fotos que manda Marcela</h2>
+    <input style="max-width:260px" placeholder="Buscar producto…" value="${esc(FOT_Q)}" oninput="FOT_Q=this.value;clearTimeout(window._fq);window._fq=setTimeout(renderFotos,200)"></div>
+  <p class="note" style="margin:6px 0 14px">${listos} de ${total} productos con fotos buenas. Hasta 3 fotos por producto (se mandan juntas) y 1 video, que sale solo cuando el cliente duda o pide ver más. Las fotos van en su calidad original; no las recorta nada.</p>
+  <div class="inv">${lista.map((p) => tarjetaFoto(p)).join('') || '<div class="empty">Ningún producto coincide.</div>'}</div>`;
+}
+
+function tarjetaFoto(p) {
+  const d = D.fotosProd[p.k] || {};
+  const fotos = (d.fotos || []).filter(Boolean);
+  const sub = FOT_SUBIENDO[p.k];
+  return `<div class="invc">
+    <div class="t">${esc(p.nombre)}${fotos.length ? '' : ' <span class="pill warn">sin fotos</span>'}</div>
+    <div class="row" style="gap:6px;margin:8px 0;flex-wrap:wrap">
+      ${fotos.map((u, i) => `<div style="position:relative">
+        <img src="${esc(u)}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line)">
+        <button class="btn sm danger" style="position:absolute;top:-6px;right:-6px;padding:2px 7px;border-radius:99px"
+          onclick="quitarFoto('${p.k}',${i})" title="Quitar">×</button></div>`).join('')}
+      ${d.video ? `<div style="position:relative">
+        <video src="${esc(d.video)}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--acc)" muted></video>
+        <button class="btn sm danger" style="position:absolute;top:-6px;right:-6px;padding:2px 7px;border-radius:99px"
+          onclick="quitarVideo('${p.k}')" title="Quitar video">×</button>
+        <span class="pill" style="position:absolute;bottom:4px;left:4px">video</span></div>` : ''}
+    </div>
+    ${sub ? `<div class="note">${esc(sub)}</div>` : `<div class="row" style="gap:6px">
+      <button class="btn sm" ${fotos.length >= 3 ? 'disabled title="Ya tiene 3"' : ''} onclick="pedirArchivo('${p.k}','${esc(p.nombre)}','foto')">+ Foto${fotos.length ? ` (${fotos.length}/3)` : ''}</button>
+      <button class="btn sm" onclick="pedirArchivo('${p.k}','${esc(p.nombre)}','video')">${d.video ? 'Cambiar video' : '+ Video'}</button>
+    </div>`}
+  </div>`;
+}
+
+function pedirArchivo(k, nombre, clase) {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = clase === 'video' ? 'video/*' : 'image/*';
+  if (clase === 'foto') inp.multiple = true;
+  inp.onchange = () => { if (inp.files?.length) subirFotos(k, nombre, clase, [...inp.files]); };
+  inp.click();
+}
+
+async function subirFotos(k, nombre, clase, archivos) {
+  const d = D.fotosProd[k] || {};
+  const yaHay = (d.fotos || []).filter(Boolean);
+  // WhatsApp rechaza fotos sobre 5 MB y videos sobre 16 MB
+  const tope = clase === 'video' ? 16 : 5;
+  const pesados = archivos.filter((f) => f.size > tope * 1024 * 1024);
+  if (pesados.length) {
+    alert(`WhatsApp no deja mandar ${clase === 'video' ? 'videos' : 'fotos'} de más de ${tope} MB.\n\nMuy pesado: ${pesados.map((f) => f.name).join(', ')}`);
+    return;
+  }
+  if (clase === 'foto' && yaHay.length + archivos.length > 3) {
+    archivos = archivos.slice(0, 3 - yaHay.length);
+    if (!archivos.length) return;
+  }
+
+  try {
+    const urls = [];
+    for (let i = 0; i < archivos.length; i++) {
+      const f = archivos[i];
+      FOT_SUBIENDO[k] = `Subiendo ${i + 1} de ${archivos.length}…`; renderFotos();
+      const ext = (f.name.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase() || (clase === 'video' ? '.mp4' : '.jpg');
+      const ruta = `fotos-producto/${k}/${clase}-${Date.now()}-${i}${ext}`;
+      const tarea = almacen.ref(ruta).put(f, { contentType: f.type, cacheControl: 'public, max-age=604800' });
+      await new Promise((ok, mal) => tarea.on('state_changed',
+        (s) => { FOT_SUBIENDO[k] = `Subiendo ${i + 1} de ${archivos.length}… ${Math.round(s.bytesTransferred / s.totalBytes * 100)}%`; renderFotos(); },
+        mal, ok));
+      urls.push(await tarea.snapshot.ref.getDownloadURL());
+    }
+
+    const { modelo, color } = partirNombre(nombre);
+    const nuevo = clase === 'video'
+      ? { video: urls[0] }
+      : { fotos: [...yaHay, ...urls].slice(0, 3) };
+    await db.ref(`${R}/config/fotosProducto/${k}`).update({
+      modelo: modelo || nombre, color: color || null, nombre,
+      ...nuevo, at: firebase.database.ServerValue.TIMESTAMP,
+    });
+  } catch (e) {
+    console.error(e);
+    alert(/unauthorized|permission/i.test(e.message || '')
+      ? 'Storage no dejó subir el archivo.\n\nRevisa que las reglas estén publicadas, y vuelve a entrar al CTV (cerrar sesión y entrar) para que tu permiso de administrador quede al día.'
+      : 'No se pudo subir: ' + e.message);
+  } finally {
+    delete FOT_SUBIENDO[k]; renderFotos();
+  }
+}
+
+async function quitarFoto(k, i) {
+  const d = D.fotosProd[k] || {}; const fotos = (d.fotos || []).filter(Boolean);
+  const url = fotos[i]; if (!url) return;
+  if (!confirm('¿Quitar esta foto?')) return;
+  await db.ref(`${R}/config/fotosProducto/${k}/fotos`).set(fotos.filter((_, j) => j !== i));
+  almacen.refFromURL(url).delete().catch((e) => console.warn('borrar foto:', e.message));
+}
+
+async function quitarVideo(k) {
+  const d = D.fotosProd[k] || {}; if (!d.video) return;
+  if (!confirm('¿Quitar el video?')) return;
+  const url = d.video;
+  await db.ref(`${R}/config/fotosProducto/${k}/video`).set(null);
+  almacen.refFromURL(url).delete().catch((e) => console.warn('borrar video:', e.message));
+}
+
 function renderInv() {
   const m = $('#main');
   if (D.productos == null) {
@@ -1342,7 +1487,7 @@ function notaVoz(id, dir) {
 function srcNota(id) { const m = D.convs?.[CHAT]?.mensajes?.[id]; return m ? srcDe({ ...m, id }) : null; }
 /* Archivos de los chats: viven aparte en medios/{chat}/{mensaje} y se bajan solo al abrir el chat */
 const MEDIOS = {}, BAJANDO = new Set();
-function srcDe(x) { return x.archivoDataUrl || x.fotoDataUrl || MEDIOS[CHAT + '/' + x.id] || null; }
+function srcDe(x) { return x.archivoDataUrl || x.fotoDataUrl || x.fotoUrl || x.videoUrl || MEDIOS[CHAT + '/' + x.id] || null; }
 async function cargarMedios(k) {
   const ms = msgsDe(D.convs[k] || {}).filter((x) => x.medio && !MEDIOS[k + '/' + x.id] && !BAJANDO.has(k + '/' + x.id)).slice(-40).reverse();
   let pend = 0;
@@ -1384,7 +1529,8 @@ function pintarNotas() {
 }));
 function cuerpoMsg(x) {
   const arch = srcDe(x);
-  if (x.fotoDataUrl && !x.tipo) x = { ...x, tipo: 'image' };
+  if ((x.fotoDataUrl || x.fotoUrl) && !x.tipo) x = { ...x, tipo: 'image' };
+  if (x.videoUrl && !x.tipo) x = { ...x, tipo: 'video' };
   if (x.medio && !arch) return `<div class="medcarga">${{ image: '📷', audio: '🎤', video: '🎬', document: '📄', sticker: '🙂' }[x.tipo] || '📎'} Cargando…</div>${x.texto ? esc(x.texto) : ''}`;
   return x.tipo === 'image' && arch ? `<img src="${arch}" alt="">${esc(x.texto || '')}` :
     x.tipo === 'audio' && arch ? notaVoz(x.id, x.direccion) :
